@@ -95,6 +95,11 @@ public class TableRelation implements AnalyzedRelation {
     }
 
     @Override
+    public boolean hasNoResult() {
+        return whereClause.noMatch() || (tableInfo.isPartitioned() && tableInfo.partitions().isEmpty());
+    }
+
+    @Override
     public WhereClause whereClause() {
         return whereClause;
     }

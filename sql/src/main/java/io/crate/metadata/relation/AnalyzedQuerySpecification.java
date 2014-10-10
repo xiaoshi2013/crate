@@ -28,6 +28,7 @@ import io.crate.analyze.EvaluatingNormalizer;
 import io.crate.analyze.where.WhereClause;
 import io.crate.metadata.ColumnIdent;
 import io.crate.metadata.table.TableInfo;
+import io.crate.planner.symbol.Literal;
 import io.crate.planner.symbol.Reference;
 import io.crate.planner.symbol.Symbol;
 
@@ -111,6 +112,18 @@ public class AnalyzedQuerySpecification implements AnalyzedRelation {
         return orderBy;
     }
 
+    @Override
+    public boolean hasNoResult() {
+        Symbol havingClause = having.orNull();
+        if (havingClause != null && havingClause instanceof Literal) {
+            Literal havingLiteral = (Literal)havingClause;
+            if (havingLiteral.value() == false) {
+                return true;
+            }
+        }
+        return sourceRelation.hasNoResult() || (limit != null && limit == 0);
+    }
+
     @Nullable
     public Integer limit() {
         return limit;
@@ -132,6 +145,7 @@ public class AnalyzedQuerySpecification implements AnalyzedRelation {
     public int numRelations() {
         return 1;
     }
+
 
     @Override
     public List<TableInfo> tables() {

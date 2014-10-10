@@ -30,9 +30,7 @@ import io.crate.exceptions.UnsupportedFeatureException;
 import io.crate.metadata.*;
 import io.crate.metadata.relation.AnalyzedQuerySpecification;
 import io.crate.planner.symbol.Function;
-import io.crate.planner.symbol.Literal;
 import io.crate.planner.symbol.Symbol;
-import io.crate.planner.symbol.SymbolType;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -109,19 +107,11 @@ public class SelectAnalysis extends AbstractDataAnalysis {
 
     @Override
     public boolean hasNoResult() {
-        Symbol havingClause = querySpecification.having().orNull();
-        if (havingClause != null && havingClause.symbolType() == SymbolType.LITERAL) {
-            Literal havingLiteral = (Literal)havingClause;
-            if (havingLiteral.value() == false) {
-                return true;
-            }
-        }
-
+        boolean hasNoResult = false;
         if (globalAggregate()) {
-            return Objects.firstNonNull(querySpecification.limit(), 1) < 1 || querySpecification.offset() > 0;
+            hasNoResult = Objects.firstNonNull(querySpecification.limit(), 1) < 1 || querySpecification.offset() > 0;
         }
-        Integer limit = querySpecification.limit();
-        return querySpecification.whereClause().noMatch() || (limit != null && limit == 0);
+        return hasNoResult || querySpecification.hasNoResult();
     }
 
     @Override

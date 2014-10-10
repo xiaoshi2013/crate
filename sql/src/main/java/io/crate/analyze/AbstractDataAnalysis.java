@@ -100,7 +100,6 @@ public abstract class AbstractDataAnalysis extends Analysis {
     }
 
     @Deprecated
-    @Override
     public void table(TableIdent tableIdent) {
         SchemaInfo schemaInfo = referenceInfos.getSchemaInfo(tableIdent.schema());
         if (schemaInfo == null) {
@@ -140,7 +139,6 @@ public abstract class AbstractDataAnalysis extends Analysis {
     }
 
     @Deprecated
-    @Override
     public TableInfo table() {
         return this.table;
     }
@@ -150,12 +148,12 @@ public abstract class AbstractDataAnalysis extends Analysis {
      * returns true for a parent column of this one.
      * returns false if info has no parent column.
      */
-    @Deprecated
-    protected boolean hasMatchingParent(ReferenceInfo info,
-                              Predicate<ReferenceInfo> parentMatchPredicate) {
+    public static  boolean hasMatchingParent(TableInfo tableInfo,
+                                             ReferenceInfo info,
+                                             Predicate<ReferenceInfo> parentMatchPredicate) {
         ColumnIdent parent = info.ident().columnIdent().getParent();
         while (parent != null) {
-            ReferenceInfo parentInfo = table.getReferenceInfo(parent);
+            ReferenceInfo parentInfo = tableInfo.getReferenceInfo(parent);
             if (parentMatchPredicate.apply(parentInfo)) {
                 return true;
             }
@@ -186,14 +184,6 @@ public abstract class AbstractDataAnalysis extends Analysis {
             allocationContext.allocatedFunctions.put(function, function);
         }
         return function;
-    }
-
-    /**
-     * Indicates that the statement will not match, so that there is no need to execute it
-     */
-    @Deprecated
-    public boolean noMatch() {
-        return whereClause().noMatch();
     }
 
     public boolean hasNoResult() {
@@ -227,10 +217,12 @@ public abstract class AbstractDataAnalysis extends Analysis {
         return rowGranularity;
     }
 
+    @Deprecated
     public List<Symbol> outputSymbols() {
         return outputSymbols;
     }
 
+    @Deprecated
     public void outputSymbols(List<Symbol> symbols) {
         this.outputSymbols = symbols;
     }
@@ -340,15 +332,17 @@ public abstract class AbstractDataAnalysis extends Analysis {
 
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> normalizeObjectValue(Map<String, Object> value, ReferenceInfo info) {
+    private Map<String, Object> normalizeObjectValue(Map<String, Object> value,
+                                                     ReferenceInfo info) {
+        TableInfo tableInfo = referenceInfos.getTableInfoSafe(info.ident().tableIdent());
         for (Map.Entry<String, Object> entry : value.entrySet()) {
             ColumnIdent nestedIdent = ColumnIdent.getChild(info.ident().columnIdent(), entry.getKey());
-            ReferenceInfo nestedInfo = table.getReferenceInfo(nestedIdent);
+            ReferenceInfo nestedInfo = tableInfo.getReferenceInfo(nestedIdent);
             if (nestedInfo == null) {
                 if (info.objectType() == ReferenceInfo.ObjectType.IGNORED) {
                     continue;
                 }
-                DynamicReference dynamicReference = table.dynamicReference(nestedIdent);
+                DynamicReference dynamicReference = tableInfo.dynamicReference(nestedIdent);
                 DataType type = DataTypes.guessType(entry.getValue(), false);
                 if (type == null) {
                     throw new ColumnValidationException(info.ident().columnIdent().fqn(), "Invalid value");
@@ -361,9 +355,11 @@ public abstract class AbstractDataAnalysis extends Analysis {
                 }
             }
             if (nestedInfo.type() == DataTypes.OBJECT && entry.getValue() instanceof Map) {
-                value.put(entry.getKey(), normalizeObjectValue((Map<String, Object>) entry.getValue(), nestedInfo));
+                value.put(entry.getKey(), normalizeObjectValue(
+                        (Map<String, Object>) entry.getValue(), nestedInfo));
             } else if (isObjectArray(nestedInfo.type()) && entry.getValue() instanceof Object[]) {
-                value.put(entry.getKey(), normalizeObjectArrayValue((Object[])entry.getValue(), nestedInfo));
+                value.put(entry.getKey(), normalizeObjectArrayValue(
+                        (Object[])entry.getValue(), nestedInfo));
             } else {
                 value.put(entry.getKey(), normalizePrimitiveValue(entry.getValue(), nestedInfo));
             }

@@ -22,11 +22,14 @@
 package io.crate.analyze;
 
 import com.google.common.base.Preconditions;
+import io.crate.analyze.where.WhereClause;
 import io.crate.core.collections.StringObjectMaps;
 import io.crate.exceptions.ColumnValidationException;
 import io.crate.metadata.ColumnIdent;
 import io.crate.metadata.TableIdent;
+import io.crate.metadata.relation.AnalyzedRelation;
 import io.crate.metadata.relation.TableRelation;
+import io.crate.metadata.table.TableInfo;
 import io.crate.planner.symbol.Literal;
 import io.crate.planner.symbol.Reference;
 import io.crate.planner.symbol.RelationSymbol;
@@ -45,19 +48,30 @@ public class UpdateStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, U
 
                 @Override
                 public Symbol visitUpdate(Update node, UpdateAnalysis.NestedAnalysis context) {
-                    process(node.relation(), context);
+                    Symbol relationSymbol = process(node.relation(), context);
+                    assert relationSymbol instanceof RelationSymbol;
+                    AnalyzedRelation relation = ((RelationSymbol) relationSymbol).relation();
+                    context.relation(relation);
                     for (Assignment assignment : node.assignements()) {
                         process(assignment, context);
                     }
-                    context.whereClause(generateWhereClause(node.whereClause(), context));
+                    if (node.whereClause().isPresent()) {
+                        Symbol query = process(node.whereClause().get(), context);
+                        relation.whereClause(new WhereClause(context.normalizer.normalize(query)));
+                    } else {
+                        relation.whereClause(WhereClause.MATCH_ALL);
+                    }
                     return null;
                 }
 
                 @Override
                 protected Symbol visitTable(Table node, UpdateAnalysis.NestedAnalysis context) {
-                    Preconditions.checkState(context.table() == null, "updating multiple tables is not supported");
-                    context.editableTable(TableIdent.of(node));
-                    return new RelationSymbol(new TableRelation(context.table(), context.partitionResolver()));
+                    Preconditions.checkState(context.relation() == null, "updating multiple tables is not supported");
+                    TableRelation tableRelation = new TableRelation(
+                            context.referenceInfos.getEditableTableInfoSafe(TableIdent.of(node)),
+                            context.partitionResolver());
+                    context.allocationContext().currentRelation = tableRelation;
+                    return new RelationSymbol(tableRelation);
                 }
 
                 @Override
@@ -69,12 +83,14 @@ public class UpdateStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, U
                         throw new IllegalArgumentException("Updating system columns is not allowed");
                     }
 
-                    ColumnIdent clusteredBy = context.table().clusteredBy();
+                    TableInfo tableInfo = context.tableInfo();
+                    ColumnIdent clusteredBy = tableInfo.clusteredBy();
                     if (clusteredBy != null && clusteredBy.equals(ident)) {
                         throw new IllegalArgumentException("Updating a clustered-by column is currently not supported");
                     }
 
-                    if (context.hasMatchingParent(reference.info(), UpdateAnalysis.NestedAnalysis.HAS_OBJECT_ARRAY_PARENT)) {
+                    if (AbstractDataAnalysis.hasMatchingParent(tableInfo,
+                            reference.info(), UpdateAnalysis.NestedAnalysis.HAS_OBJECT_ARRAY_PARENT)) {
                         // cannot update fields of object arrays
                         throw new IllegalArgumentException("Updating fields of object arrays is not supported");
                     }
@@ -88,10 +104,10 @@ public class UpdateStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, U
                         throw new ColumnValidationException(ident.fqn(), e);
                     }
 
-                    for (ColumnIdent pkIdent : context.table().primaryKey()) {
+                    for (ColumnIdent pkIdent : tableInfo.primaryKey()) {
                         ensureNotUpdated(ident, updateValue, pkIdent, "Updating a primary key is not supported");
                     }
-                    for (ColumnIdent partitionIdent : context.table.partitionedBy()) {
+                    for (ColumnIdent partitionIdent : tableInfo.partitionedBy()) {
                         ensureNotUpdated(ident, updateValue, partitionIdent, "Updating a partitioned-by column is not supported");
                     }
 

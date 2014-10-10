@@ -33,7 +33,6 @@ public abstract class AbstractDDLAnalysis extends Analysis {
         super(parameterContext);
     }
 
-    @Override
     public void table(TableIdent tableIdent) {
         if (!isValidTableName(tableIdent.name())) {
             throw new InvalidTableNameException(tableIdent.name());

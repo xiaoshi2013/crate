@@ -26,7 +26,7 @@ import com.google.common.collect.Iterables;
 import io.crate.metadata.Functions;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.ReferenceResolver;
-import io.crate.metadata.TableIdent;
+import io.crate.metadata.relation.AnalyzedRelation;
 import io.crate.metadata.table.TableInfo;
 import io.crate.planner.symbol.Reference;
 import io.crate.planner.symbol.Symbol;
@@ -68,23 +68,15 @@ public class UpdateAnalysis extends Analysis {
     }
 
     @Override
-    public void table(TableIdent tableIdent) {
-        throw new UnsupportedOperationException("used nested analysis");
-    }
-
-    @Override
-    public TableInfo table() {
-        throw new UnsupportedOperationException("used nested analysis");
-    }
-
-    @Override
     public boolean hasNoResult() {
         return Iterables.all(nestedAnalysisList, HAS_NO_RESULT_PREDICATE);
     }
 
     @Override
     public void normalize() {
-
+        for (NestedAnalysis nestedAnalysis : nestedAnalysisList) {
+            nestedAnalysis.normalize();
+        }
     }
 
     @Override
@@ -99,6 +91,8 @@ public class UpdateAnalysis extends Analysis {
     public static class NestedAnalysis extends AbstractDataAnalysis {
 
         private Map<Reference, Symbol> assignments = new HashMap<>();
+        private AnalyzedRelation relation;
+        private TableInfo tableInfo;
 
         public NestedAnalysis(ReferenceInfos referenceInfos,
                               Functions functions,
@@ -107,9 +101,28 @@ public class UpdateAnalysis extends Analysis {
             super(referenceInfos, functions, parameterContext, referenceResolver);
         }
 
+        public void relation(AnalyzedRelation relation) {
+            this.relation = relation;
+            assert relation.tables().size() == 1;
+            this.tableInfo = relation.tables().get(0);
+        }
+
+        public AnalyzedRelation relation() {
+            return relation;
+        }
+
+        public TableInfo tableInfo() {
+            return tableInfo;
+        }
+
+        @Override
+        public void normalize() {
+            relation.normalize(normalizer);
+        }
+
         @Override
         public boolean hasNoResult() {
-            return whereClause().noMatch();
+            return relation.hasNoResult();
         }
 
         public Map<Reference, Symbol> assignments() {
@@ -120,7 +133,7 @@ public class UpdateAnalysis extends Analysis {
             if (assignments.containsKey(reference)) {
                 throw new IllegalArgumentException(String.format(Locale.ENGLISH, "reference repeated %s", reference.info().ident().columnIdent().fqn()));
             }
-            if (!reference.info().ident().tableIdent().equals(table().ident())) {
+            if (!reference.info().ident().tableIdent().equals(tableInfo.ident())) {
                 throw new UnsupportedOperationException("cannot update references from other tables.");
             }
             assignments.put(reference, value);

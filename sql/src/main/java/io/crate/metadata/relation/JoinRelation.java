@@ -76,6 +76,11 @@ public class JoinRelation implements AnalyzedRelation {
     }
 
     @Override
+    public boolean hasNoResult() {
+        return true; // TODO:
+    }
+
+    @Override
     public WhereClause whereClause() {
         // TODO:
         return null;

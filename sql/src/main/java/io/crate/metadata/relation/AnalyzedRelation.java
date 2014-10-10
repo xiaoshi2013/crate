@@ -40,6 +40,8 @@ public interface AnalyzedRelation {
      */
     public int numRelations();
 
+    public boolean hasNoResult();
+
     public WhereClause whereClause();
 
     public void whereClause(WhereClause whereClause);

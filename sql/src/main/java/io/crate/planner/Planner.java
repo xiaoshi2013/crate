@@ -36,6 +36,7 @@ import io.crate.exceptions.UnhandledServerException;
 import io.crate.metadata.*;
 import io.crate.metadata.doc.DocSchemaInfo;
 import io.crate.metadata.doc.DocSysColumns;
+import io.crate.metadata.relation.AliasedAnalyzedRelation;
 import io.crate.metadata.relation.AnalyzedQuerySpecification;
 import io.crate.metadata.relation.AnalyzedRelation;
 import io.crate.metadata.relation.TableRelation;
@@ -189,12 +190,21 @@ public class Planner extends AnalysisVisitor<Planner.Context, Plan> {
         Plan plan = new Plan();
         for (UpdateAnalysis.NestedAnalysis nestedAnalysis : analysis.nestedAnalysis()) {
             if (!nestedAnalysis.hasNoResult()) {
+                TableRelation tableRelation;
+                if (nestedAnalysis.relation() instanceof TableRelation) {
+                    tableRelation = (TableRelation) nestedAnalysis.relation();
+                } else if (nestedAnalysis.relation() instanceof AliasedAnalyzedRelation) {
+                    tableRelation = (TableRelation) ((AliasedAnalyzedRelation) nestedAnalysis.relation()).child();
+                } else {
+                    throw new UnsupportedOperationException("Relation must be a TableRelation or AliasedAnalyzedRelation");
+                }
+
                 ESUpdateNode node = new ESUpdateNode(
-                        indices(nestedAnalysis),
+                        indices(tableRelation),
                         nestedAnalysis.assignments(),
-                        nestedAnalysis.whereClause(),
-                        nestedAnalysis.ids(),
-                        nestedAnalysis.routingValues()
+                        tableRelation.whereClause(),
+                        tableRelation.ids(),
+                        tableRelation.routingValues()
                 );
                 plan.add(node);
             }
@@ -207,11 +217,11 @@ public class Planner extends AnalysisVisitor<Planner.Context, Plan> {
     protected Plan visitDeleteAnalysis(DeleteAnalysis analysis, Context context) {
         Plan plan = new Plan();
         for (DeleteAnalysis.NestedDeleteAnalysis nestedDeleteAnalysis : analysis.nestedAnalysis()) {
-            if (nestedDeleteAnalysis.ids().size() == 1 &&
-                    nestedDeleteAnalysis.routingValues().size() == 1) {
+            if (nestedDeleteAnalysis.relation().ids().size() == 1 &&
+                    nestedDeleteAnalysis.relation().routingValues().size() == 1) {
                 ESDelete(nestedDeleteAnalysis, plan);
             } else {
-                ESDeleteByQuery(nestedDeleteAnalysis, plan);
+                ESDeleteByQuery(nestedDeleteAnalysis.relation(), plan);
             }
         }
         return plan;
@@ -453,36 +463,38 @@ public class Planner extends AnalysisVisitor<Planner.Context, Plan> {
     }
 
     private void ESDelete(DeleteAnalysis.NestedDeleteAnalysis analysis, Plan plan) {
-        WhereClause whereClause = analysis.whereClause();
-        if (analysis.ids().size() == 1 && analysis.routingValues().size() == 1) {
+        AnalyzedRelation relation = analysis.relation();
+        assert relation instanceof TableRelation : "in delete case relation must be a TableRelation";
+        TableRelation tableRelation = (TableRelation) relation;
+
+        if (tableRelation.ids().size() == 1 && tableRelation.routingValues().size() == 1) {
             plan.add(new ESDeleteNode(
-                    indices(analysis)[0],
-                    analysis.ids().get(0),
-                    analysis.routingValues().get(0),
-                    whereClause.version()));
+                    indices(tableRelation)[0],
+                    tableRelation.ids().get(0),
+                    tableRelation.routingValues().get(0),
+                    tableRelation.whereClause().version()));
             plan.expectsAffectedRows(true);
         } else {
             // TODO: implement bulk delete task / node
-            ESDeleteByQuery(analysis, plan);
+            ESDeleteByQuery(tableRelation, plan);
         }
     }
 
-    private void ESDeleteByQuery(DeleteAnalysis.NestedDeleteAnalysis analysis, Plan plan) {
-        String[] indices = indices(analysis);
+    private void ESDeleteByQuery(TableRelation tableRelation, Plan plan) {
+        String[] indices = indices(tableRelation);
 
-        if (indices.length > 0 && !analysis.whereClause().noMatch()) {
-            if (!analysis.whereClause().hasQuery() && analysis.table().isPartitioned()) {
+        if (indices.length > 0 && !tableRelation.hasNoResult()) {
+            if (!tableRelation.whereClause().hasQuery() && tableRelation.tableInfo().isPartitioned()) {
                 for (String index : indices) {
                     plan.add(new ESDeleteIndexNode(index, true));
                 }
-
             } else {
                 // TODO: if we allow queries like 'partitionColumn=X or column=Y' which is currently
                 // forbidden through analysis, we must issue deleteByQuery request in addition
                 // to above deleteIndex request(s)
                 ESDeleteByQueryNode node = new ESDeleteByQueryNode(
                         indices,
-                        analysis.whereClause());
+                        tableRelation.whereClause());
                 plan.add(node);
             }
         }
@@ -1173,24 +1185,26 @@ public class Planner extends AnalysisVisitor<Planner.Context, Plan> {
     /**
      * return the ES index names the query should go to
      */
-    private String[] indices(AbstractDataAnalysis analysis) {
+    private String[] indices(TableRelation tableRelation) {
         String[] indices;
 
-        if (analysis.noMatch()) {
+        if (tableRelation.hasNoResult()) {
             indices = org.elasticsearch.common.Strings.EMPTY_ARRAY;
-        } else if (!analysis.table().isPartitioned()) {
+        } else if (!tableRelation.tableInfo().isPartitioned()) {
             // table name for non-partitioned tables
-            indices = new String[]{ analysis.table().ident().name() };
-        } else if (analysis.whereClause().partitions().size() == 0) {
+            indices = new String[]{ tableRelation.tableInfo().ident().name() };
+        } else if (tableRelation.whereClause().partitions().size() == 0) {
+            assert !tableRelation.whereClause().noMatch() : "must match if all partitions should be selected";
             // all partitions
-            indices = new String[analysis.table().partitions().size()];
-            for (int i = 0; i < analysis.table().partitions().size(); i++) {
-                indices[i] = analysis.table().partitions().get(i).stringValue();
+            List<PartitionName> partitions = tableRelation.tableInfo().partitions();
+            indices = new String[partitions.size()];
+            for (int i = 0; i < partitions.size(); i++) {
+                indices[i] = partitions.get(i).stringValue();
             }
 
         } else {
-            indices = analysis.whereClause().partitions().toArray(
-                    new String[analysis.whereClause().partitions().size()]);
+            indices = tableRelation.whereClause().partitions().toArray(
+                    new String[tableRelation.whereClause().partitions().size()]);
         }
         return indices;
     }

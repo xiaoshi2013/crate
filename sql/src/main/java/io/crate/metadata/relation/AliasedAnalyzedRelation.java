@@ -54,9 +54,18 @@ public class AliasedAnalyzedRelation implements AnalyzedRelation {
         return alias;
     }
 
+    public AnalyzedRelation child() {
+        return child;
+    }
+
     @Override
     public int numRelations() {
         return child.numRelations();
+    }
+
+    @Override
+    public boolean hasNoResult() {
+        return child.hasNoResult();
     }
 
     @Override

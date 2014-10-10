@@ -22,8 +22,11 @@
 package io.crate.analyze;
 
 import com.google.common.base.Preconditions;
+import io.crate.analyze.where.WhereClause;
 import io.crate.metadata.TableIdent;
+import io.crate.metadata.relation.AnalyzedRelation;
 import io.crate.metadata.relation.TableRelation;
+import io.crate.metadata.table.TableInfo;
 import io.crate.planner.symbol.RelationSymbol;
 import io.crate.planner.symbol.Symbol;
 import io.crate.sql.tree.Delete;
@@ -34,18 +37,30 @@ public class DeleteStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, D
     final DataStatementAnalyzer<DeleteAnalysis.NestedDeleteAnalysis> innerAnalyzer = new DataStatementAnalyzer<DeleteAnalysis.NestedDeleteAnalysis>() {
         @Override
         public Symbol visitDelete(Delete node, DeleteAnalysis.NestedDeleteAnalysis context) {
-            process(node.getRelation(), context);
-            context.whereClause(generateWhereClause(node.getWhere(), context));
+            Symbol relationSymbol = process(node.getRelation(), context);
+            assert relationSymbol instanceof RelationSymbol;
+
+            AnalyzedRelation relation = ((RelationSymbol) relationSymbol).relation();
+            context.relation(relation);
+            if (node.getWhere().isPresent()) {
+                Symbol query = process(node.getWhere().get(), context);
+                relation.whereClause(new WhereClause(context.normalizer.normalize(query)));
+            } else {
+                relation.whereClause(WhereClause.MATCH_ALL);
+            }
 
             return null;
         }
 
         @Override
         protected Symbol visitTable(Table node, DeleteAnalysis.NestedDeleteAnalysis context) {
-            Preconditions.checkState(context.table() == null, "deleting multiple tables is not supported");
-            context.editableTable(TableIdent.of(node));
-
-            return new RelationSymbol(new TableRelation(context.table(), context.partitionResolver()));
+            Preconditions.checkState(context.relation() == null, "deleting multiple tables is not supported");
+            TableIdent tableIdent = TableIdent.of(node);
+            TableInfo tableInfo = context.referenceInfos.getEditableTableInfoSafe(tableIdent);
+            context.updateRowGranularity(tableInfo.rowGranularity());
+            TableRelation tableRelation = new TableRelation(tableInfo, context.partitionResolver());
+            context.allocationContext().currentRelation = tableRelation;
+            return new RelationSymbol(tableRelation);
         }
     };
 

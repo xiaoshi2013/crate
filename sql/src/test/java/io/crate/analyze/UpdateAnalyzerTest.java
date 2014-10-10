@@ -43,7 +43,6 @@ import io.crate.planner.symbol.*;
 import io.crate.sql.parser.SqlParser;
 import io.crate.types.ArrayType;
 import io.crate.types.DataTypes;
-import junit.framework.Assert;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.inject.Module;
 import org.junit.Rule;
@@ -180,7 +179,7 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
     public void testUpdateAssignments() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis = analyze("update users set name='Trillian'");
         assertThat(analysis.assignments().size(), is(1));
-        assertThat(analysis.table().ident(), is(new TableIdent(null, "users")));
+        assertThat(analysis.tableInfo().ident(), is(new TableIdent(null, "users")));
 
         Reference ref = analysis.assignments().keySet().iterator().next();
         assertThat(ref.info().ident().tableIdent().name(), is("users"));
@@ -198,7 +197,7 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
 
         Reference ref = analysis.assignments().keySet().iterator().next();
         assertThat(ref, instanceOf(DynamicReference.class));
-        Assert.assertEquals(DataTypes.LONG, ref.info().type());
+        assertEquals(DataTypes.LONG, ref.info().type());
         assertThat(ref.info().ident().columnIdent().isColumn(), is(false));
         assertThat(ref.info().ident().columnIdent().fqn(), is("details.arms"));
     }
@@ -230,21 +229,21 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
     @Test
     public void testNoWhereClause() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis = analyze("update users set other_id=9");
-        assertThat(analysis.whereClause(), is(WhereClause.MATCH_ALL));
+        assertThat(analysis.relation().whereClause(), is(WhereClause.MATCH_ALL));
     }
 
     @Test
     public void testNoMatchWhereClause() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis = analyze("update users set other_id=9 where true=false");
-        assertThat(analysis.whereClause().noMatch(), is(true));
+        assertThat(analysis.relation().whereClause().noMatch(), is(true));
     }
 
     @Test
     public void testUpdateWhereClause() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis =
                 analyze("update users set other_id=9 where name='Trillian'");
-        assertThat(analysis.whereClause().hasQuery(), is(true));
-        assertThat(analysis.whereClause().noMatch(), is(false));
+        assertThat(analysis.relation().whereClause().hasQuery(), is(true));
+        assertThat(analysis.relation().whereClause().noMatch(), is(false));
     }
 
     @Test(expected = UnsupportedOperationException.class)
@@ -289,10 +288,11 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
                 0L
         );
 
-        assertLiteralSymbol(((Function)analysis.whereClause().query()).arguments().get(1), 9L);
+        assertLiteralSymbol(((Function)analysis.relation().whereClause().query()).arguments().get(1), 9L);
     }
 
 
+    @Test
     public void testUpdateWithWrongParameters() throws Exception {
         expectedException.expect(ColumnValidationException.class);
         expectedException.expectMessage("Validation failed for name: cannot cast {} to string");
@@ -346,11 +346,11 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
     public void testUpdateWherePartitionedByColumn() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis = analyze(
                 "update parted set id = 2 where date = 1395874800000");
-        assertThat(analysis.whereClause().hasQuery(), is(false));
-        assertThat(analysis.whereClause().noMatch(), is(false));
+        assertThat(analysis.relation().whereClause().hasQuery(), is(false));
+        assertThat(analysis.relation().whereClause().noMatch(), is(false));
         assertEquals(ImmutableList.of(
                         new PartitionName("parted", Arrays.asList(new BytesRef("1395874800000"))).stringValue()),
-                analysis.whereClause().partitions()
+                analysis.relation().whereClause().partitions()
         );
     }
 
@@ -368,8 +368,8 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
                 actualAnalysis.assignments()
         );
         assertEquals(
-                ((Function) expectedAnalysis.whereClause().query()).arguments().get(0),
-                ((Function) actualAnalysis.whereClause().query()).arguments().get(0)
+                ((Function) expectedAnalysis.relation().whereClause().query()).arguments().get(0),
+                ((Function) actualAnalysis.relation().whereClause().query()).arguments().get(0)
         );
     }
 
@@ -389,6 +389,6 @@ public class UpdateAnalyzerTest extends BaseAnalyzerTest {
     public void testUpdateWithVersionZero() throws Exception {
         UpdateAnalysis.NestedAnalysis analysis = analyze(
                 "update users set awesome=true where name='Ford' and _version=0");
-        assertThat(analysis.whereClause().noMatch(), is(true));
+        assertThat(analysis.relation().whereClause().noMatch(), is(true));
     }
 }

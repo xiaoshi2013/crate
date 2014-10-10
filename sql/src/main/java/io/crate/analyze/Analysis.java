@@ -22,8 +22,6 @@
 package io.crate.analyze;
 
 import com.google.common.collect.ImmutableList;
-import io.crate.metadata.TableIdent;
-import io.crate.metadata.table.TableInfo;
 
 import java.util.List;
 
@@ -35,12 +33,6 @@ public abstract class Analysis {
     protected Analysis(Analyzer.ParameterContext parameterContext) {
         this.parameterContext = parameterContext;
     }
-
-    @Deprecated
-    public abstract void table(TableIdent tableIdent);
-
-    @Deprecated
-    public abstract TableInfo table();
 
     public abstract boolean hasNoResult();
 

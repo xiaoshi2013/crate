@@ -23,11 +23,13 @@ package io.crate.analyze;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+import io.crate.analyze.where.WhereClause;
 import io.crate.metadata.Functions;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.ReferenceResolver;
-import io.crate.metadata.TableIdent;
-import io.crate.metadata.table.TableInfo;
+import io.crate.metadata.relation.AliasedAnalyzedRelation;
+import io.crate.metadata.relation.AnalyzedRelation;
+import io.crate.metadata.relation.TableRelation;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -68,21 +70,15 @@ public class DeleteAnalysis extends Analysis {
     }
 
     @Override
-    public void table(TableIdent tableIdent) {
-    }
-
-    @Override
-    public TableInfo table() {
-        throw new UnsupportedOperationException("use nested analysis");
-    }
-
-    @Override
     public boolean hasNoResult() {
         return Iterables.all(nestedAnalysisList, HAS_NO_RESULT_PREDICATE);
     }
 
     @Override
     public void normalize() {
+        for (NestedDeleteAnalysis nestedDeleteAnalysis : nestedAnalysisList) {
+            nestedDeleteAnalysis.normalize();
+        }
     }
 
     @Override
@@ -92,13 +88,38 @@ public class DeleteAnalysis extends Analysis {
 
     public static class NestedDeleteAnalysis extends AbstractDataAnalysis {
 
+        private TableRelation relation;
+
         public NestedDeleteAnalysis(ReferenceInfos referenceInfos, Functions functions, Analyzer.ParameterContext parameterContext, ReferenceResolver referenceResolver) {
             super(referenceInfos, functions, parameterContext, referenceResolver);
         }
 
+        public void relation(AnalyzedRelation relation) {
+            if (relation instanceof AliasedAnalyzedRelation) {
+                this.relation = (TableRelation) relation.children().get(0);
+            } else {
+                this.relation = (TableRelation) relation;
+            }
+        }
+
+        public TableRelation relation() {
+            return relation;
+        }
+
+        @Deprecated
+        @Override
+        public WhereClause whereClause() {
+            throw new UnsupportedOperationException("whereClause on NestedDeleteAnalysis is deprecated");
+        }
+
+        @Override
+        public void normalize() {
+            relation.normalize(normalizer);
+        }
+
         @Override
         public boolean hasNoResult() {
-            return super.whereClause().noMatch();
+            return relation.whereClause().noMatch();
         }
 
         @Override
