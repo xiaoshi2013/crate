@@ -1,0 +1,93 @@
+==============================
+Safety and Liveness Guarantees
+==============================
+
+This document describes some of the guarantees made by the crate data
+store concerning safety and liveness of the data written to it. It is
+by far not complete nor do the described guarantees hold under all
+circumstances. There might be bugs we do not know yet. Please consider
+this document as a description of what we know so far.
+
+
+Consistent Writes
+=================
+
+Crate tables are sharded by default, with all the primaries evenly
+distributed among the cluster. Per default every shard has one
+replica. The :ref:`number_of_replicas` setting can be changed at any
+time. Every shard of a replica set will be placed on another node in
+order to distribute them as much as possible. Two replicas on the same
+node do not add additional safety of this shards data in case of this
+node going down. If there are more replicas configured than nodes
+available in a cluster, the remaining replicas won't be allocated,
+making sure that distribution of replicas is optimized.
+
+So a crate table consists of a set of replica sets of 1 primary and 0
+too many configured replicas. (See :ref:`number_of_replicas`.)
+
+Accepting Writes
+----------------
+
+When writing to crate using ``INSERT``, ``UPDATE`` or ``COPY FROM``
+every inserted/updated single row will be written to the primary shard of a
+replica set. The operation will only succeed if the **quorum of
+shards** ``(N/2) + 1`` in a replica set is available. If there is only
+1 replica in a set, the operation succeeds if the primary successfully
+stored the row. The same applies for 0 replicas, where there is no
+consistency to be guaranteed.
+
+Requiring a quorum of shards to be available for a write prevents
+inconsistent writes e.g. during a netsplit.
+
+Imagine a cluster of 5 nodes with a table ``t`` with 10 shards and 4
+configured replicas. We have 40 = 10 * 4 shards with approximately 8
+shards on every node. If two nodes got split from the rest of the
+cluster, they won't accept writes to this table. The other three nodes
+will, however, still accept writes, as 3 shards is still a majority.
+
+Synchronous Writes
+------------------
+
+Every write is **synchronous**, that means that it returns after all
+replicas successfully stored the row. So you can be sure that the
+write operation (``INSERT``, ``UPDATE`` or ``COPY FROM``) is finished
+and consistency is guaranteed when the query returns.
+
+But nonetheless, a follow-up ``SELECT`` statement for that row may not
+get the freshly stored result back yet. The write operation is not
+necessarily written to the lucene index it will spent its whole
+lifetime in, but to the :ref:`guarantees_translog`.
+
+.. _guarantees_translog:
+
+Translog
+========
+
+Crate writes all operations that manipulate the underlying data, like
+DML and most of the DDL statements, to its *Translog* first. This is a
+Write-Ahead-Log, queuing up the writes before they are flushed to disk
+as a new lucene segment.
+
+The *Translog* is used to linearize the insert/update/delete
+operations made to a shard. It also ensures that those operations are
+applied atomically. Almost all ``SELECT`` queries operate on the
+lucene indices, only ``SELECT``ing objects by their primary keys uses
+the translog as data-source to get realtime results. By default, the
+*Translog* will be flushed every second if new operations occured
+that need to be persisted. This default interval can be changed using
+the :ref:`sql_ref_refresh_interval` setting. Using
+:ref:`refresh_data` on a table will force the *Translog* for every
+shards to be flushed to a new lucene segment, which means, to disk.
+
+
+Quorum configuration
+
+
+cluster state und NUR CONFIG master
+
+
+minimum master node
+
+Countermeasures
+===============
+
