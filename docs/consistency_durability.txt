@@ -1,0 +1,115 @@
+.. _consistency_durability:
+
+============================
+ Consistency and Durability
+============================
+
+This document describes consistency and durability behaviour at Crate
+without going to much into technical details. The primary focus of
+this document is to explain the related context to a wide range of users.
+
+.. _consistency:
+
+Consistency
+===========
+
+Crate is build using the `Eventual Consistency`_ model, meaning that
+updated data is not guaranteed to be visible to all concurrent reads.
+Updated data is not immediately flushed to disk in order to achive high
+performance. See the `Near Real-Time Searches`_ section for details.
+
+In general, write requests do only succeed if a quorum of replicas is
+available. The default quorum for write consistency is **(N/2) +
+1**. A write request will fail with an error if this quorum cannot be
+achived. The write consistency behaviour can be changed by defining the
+``action.write_consistency`` node setting, possible values are:
+
+:quorum: Writes will succeed if the primary shard and a quorum of
+         replicas is available (default).
+:one: Writes will succeed if the primary shard is available.
+:all: Writes will succeed if the primary shard all replicas are available.
+
+.. note:
+
+   If the ``number_of_replicas`` table setting is set to *1*
+   (default, total of 2 copies of the data), the quorum is **1**
+   ((1/2)+1 ~= 1) and so writes will succeed if 1 copy (the primary)
+   is available and can perform the write.
+
+.. _near_real-time_searches:
+
+Near Real-Time Searches
+-----------------------
+
+In order to keep write performance as high as possible, Crate do not
+flush changed data (created or updated documents) to disk (using
+``fsync``) nor will the data written to the filesystem-cache immediately.
+Instead the changed documents are written to an in-memory buffer and
+to the :ref:`translog <translog>`. As long as the documents are only
+available through the in-memory buffer (and the :ref:`translog
+<translog>`) these documents are **not visible to read requests**.
+
+Once every second (default, controllable by the table setting
+:ref:`sql_ref_refresh_interval`) or if a :ref:`refresh <sql_ref_refresh>`
+statement is issued, the documents in the in-memory buffer are written
+to the filesystem-cache (without an ``fsync``) and are available to
+all read requests. Thats why it is called *Near Real-time*.
+
+One exception is, querying for documents by its primary key(s). In
+that case Crate uses the translog to find and return these documents.
+
+.. _durability:
+
+Durability
+==========
+
+Durability at Crate is guaranteed through the use of replicas. If the
+node holding a primary shard is not accessible anymore (through
+overload, network latency, crashes, acts of God, ...) a replica of the
+shard is instantaneous promoted to be primary so all requests will
+succeed.
+This may also sometimes referred as *self-healing* because
+not only a replica will be promoted to be the new primary but also new
+replicas will be created instantaneous in order to achive the same
+durability than before.
+
+Of course, with ``number_of_replicas`` set to 0, no replicas are
+created and so no durability can be guaranteed.
+
+.. _translog:
+
+Durability and Atomicity of Internal Operations (Translog)
+----------------------------------------------------------
+
+Crate uses a transaction log (Write-Ahead-Log) dedicated to each
+shard which records all write operations (INSERT, UPDATE or DELETE) to
+guarantee atomicity and durability of each operation while not
+flushing every operation to the underlaying storage layer (``fsync``).
+Flushing/Commiting an operation from the filesystem-cache to disk may
+be an expensive operation and so, it cannot be done every time a
+operation occures while keeping performance high. But without,
+e.g. after a power failure, some operations would be lost. While
+writing operations to the filesystem-cache AND to the translog,
+operations can be applied after a power failure or even after exiting
+the application normally.
+
+By default, the translog is flushed to disk using ``fsync`` every 5
+seconds. This value can be changed by the ``index.gateway.local.sync``
+setting.
+
+.. _atomicity_isolation:
+
+Atomicity and Isolation
+=======================
+
+At Crate, atomicity and isolation is per document. Every write
+operation to a document results in an incremented version number of
+the document. This increment is atomic and guranteed to happen if the
+operation returned successfully.
+
+By using the :ref:`version column <sql_ddl_system_column_version>`,
+:ref:`OCC <sql_occ>` can be achived.
+
+
+
+.. _Eventual Consistency: http://en.wikipedia.org/wiki/Eventual_consistency
