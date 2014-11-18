@@ -10,6 +10,7 @@ import io.crate.operation.aggregation.AggregationFunction;
 import io.crate.operation.aggregation.impl.AggregationImplModule;
 import io.crate.operation.aggregation.impl.CountAggregation;
 import io.crate.operation.collect.CollectExpression;
+import io.crate.operation.projectors.groupby.GroupingProjector;
 import io.crate.planner.symbol.Aggregation;
 import io.crate.planner.symbol.Symbol;
 import io.crate.types.DataType;

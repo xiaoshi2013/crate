@@ -296,7 +296,7 @@ public class BulkShardProcessor {
         trace("execute failure");
         e = Exceptions.unwrap(e);
         if (e instanceof EsRejectedExecutionException) {
-            logger.warn("{}, retrying", e.getMessage());
+            logger.debug("{}, retrying", e.getMessage());
             doRetry(bulkShardRequest, repeatingRetry);
         } else {
             if (repeatingRetry) {

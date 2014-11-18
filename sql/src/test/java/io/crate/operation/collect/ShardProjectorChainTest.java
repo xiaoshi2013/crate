@@ -31,6 +31,7 @@ import io.crate.operation.aggregation.impl.AggregationImplModule;
 import io.crate.operation.aggregation.impl.CountAggregation;
 import io.crate.operation.operator.OperatorModule;
 import io.crate.operation.projectors.*;
+import io.crate.operation.projectors.groupby.GroupingProjector;
 import io.crate.operation.scalar.ScalarFunctionModule;
 import io.crate.planner.RowGranularity;
 import io.crate.planner.projection.GroupProjection;

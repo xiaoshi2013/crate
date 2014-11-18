@@ -19,8 +19,10 @@
  * software solely pursuant to the terms of the relevant commercial agreement.
  */
 
-package io.crate.operation.projectors;
+package io.crate.operation.projectors.groupby;
 
+import com.carrotsearch.hppc.IntObjectOpenHashMap;
+import com.carrotsearch.hppc.cursors.IntObjectCursor;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import io.crate.operation.AggregationContext;
@@ -29,10 +31,16 @@ import io.crate.operation.ProjectorUpstream;
 import io.crate.operation.aggregation.AggregationCollector;
 import io.crate.operation.aggregation.AggregationState;
 import io.crate.operation.collect.CollectExpression;
+import io.crate.operation.projectors.Projector;
 import io.crate.types.DataType;
 import io.crate.types.DataTypes;
+import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.common.logging.Loggers;
+import org.elasticsearch.monitor.jvm.JvmStats;
+import org.github.jamm.MemoryMeter;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,8 +48,10 @@ import java.util.concurrent.atomic.AtomicReference;
 public class GroupingProjector implements Projector {
 
     private final CollectExpression[] collectExpressions;
+    private final ESLogger logger = Loggers.getLogger(getClass());
 
     private final Grouper grouper;
+    private final CircuitBreaker circuitBreaker;
 
     private Projector downstream;
     private AtomicInteger remainingUpstreams = new AtomicInteger(0);
@@ -63,8 +73,26 @@ public class GroupingProjector implements Projector {
                     aggregations[i].inputs()
             );
         }
+
+        long baseMemoryUsage = 1024 * 1024 * 75; // assumption: 75 mb base that crate uses
+        long memoryLimit = (long) ((JvmStats.jvmStats().mem().getHeapMax().bytes() - baseMemoryUsage) * 0.70);
+        circuitBreaker = new CircuitBreaker(memoryLimit, 1.03);
         if (keyInputs.size() == 1) {
-            grouper = new SingleKeyGrouper(keyInputs.get(0), collectExpressions, aggregationCollectors);
+            DataType keyType = Iterables.getOnlyElement(keyTypes);
+            if (keyType.equals(DataTypes.INTEGER)) {
+                //noinspection unchecked
+                grouper = new IntKeyGrouper(
+                        (Input<Integer>) Iterables.getOnlyElement(keyInputs),
+                        collectExpressions,
+                        aggregationCollectors
+                );
+            } else {
+                grouper = new SingleKeyGrouper(
+                        keyType,
+                        Iterables.getOnlyElement(keyInputs),
+                        collectExpressions,
+                        aggregationCollectors);
+            }
         } else {
             grouper = new ManyKeyGrouper(keyInputs, collectExpressions, aggregationCollectors);
         }
@@ -95,7 +123,6 @@ public class GroupingProjector implements Projector {
         for (CollectExpression collectExpression : collectExpressions) {
             collectExpression.startCollect();
         }
-
         if (remainingUpstreams.get() <= 0) {
             upstreamFinished();
         }
@@ -103,7 +130,12 @@ public class GroupingProjector implements Projector {
 
     @Override
     public synchronized boolean setNextRow(final Object... row) {
-        return grouper.setNextRow(row);
+        try {
+            return grouper.setNextRow(row);
+        } catch (IOException e) {
+            downstream.upstreamFailed(e);
+            return false;
+        }
     }
 
     @Override
@@ -113,6 +145,8 @@ public class GroupingProjector implements Projector {
 
     @Override
     public void upstreamFinished() {
+        MemoryMeter memoryMeter = new MemoryMeter();
+        System.out.println("grouper size is: " + memoryMeter.measureDeep(grouper));
         if (remainingUpstreams.decrementAndGet() <= 0) {
             grouper.finish();
         }
@@ -151,8 +185,8 @@ public class GroupingProjector implements Projector {
     }
 
     private static void singleTransformToRow(Map.Entry<Object, AggregationState[]> entry,
-                                       Object[] row,
-                                       AggregationCollector[] aggregationCollectors) {
+                                             Object[] row,
+                                             AggregationCollector[] aggregationCollectors) {
         int c = 0;
         row[c] = entry.getKey();
         c++;
@@ -164,10 +198,87 @@ public class GroupingProjector implements Projector {
         }
     }
 
-    private interface Grouper {
-        boolean setNextRow(final Object... row);
-        Object[][] finish();
-        Iterator<Object[]> iterator();
+    public class IntKeyGrouper implements Grouper {
+
+        private final Input<Integer> keyInput;
+        private final CollectExpression[] collectExpressions;
+        private final AggregationCollector[] aggregationCollectors;
+        private final IntObjectOpenHashMap<AggregationState[]> result;
+
+        public IntKeyGrouper(Input<Integer> keyInput,
+                             CollectExpression[] collectExpressions,
+                             AggregationCollector[] aggregationCollectors) {
+
+            this.keyInput = keyInput;
+            this.collectExpressions = collectExpressions;
+            this.aggregationCollectors = aggregationCollectors;
+            this.result = new IntObjectOpenHashMap<>();
+        }
+
+        @Override
+        public boolean setNextRow(Object... row) {
+            for (CollectExpression collectExpression : collectExpressions) {
+                collectExpression.setNextRow(row);
+            }
+
+            Integer key = keyInput.value();
+            AggregationState[] states = result.get(key);
+            if (states == null) {
+                states = new AggregationState[aggregationCollectors.length];
+                for (int i = 0; i < aggregationCollectors.length; i++) {
+                    aggregationCollectors[i].startCollect();
+                    aggregationCollectors[i].processRow();
+                    states[i] = aggregationCollectors[i].state();
+                }
+                result.put(key, states);
+            } else {
+                for (int i = 0; i < aggregationCollectors.length; i++) {
+                    aggregationCollectors[i].state(states[i]);
+                    aggregationCollectors[i].processRow();
+                }
+            }
+            return true;
+        }
+
+        @Override
+        public Object[][] finish() {
+            Throwable throwable = failure.get();
+            if (throwable != null && downstream != null) {
+                downstream.upstreamFailed(throwable);
+            }
+
+            Object[][] rows = new Object[result.size()][1 + aggregationCollectors.length];
+            boolean sendToDownStream = downstream != null;
+            int r = 0;
+            for (IntObjectCursor<AggregationState[]> cursor : result) {
+                Object[] row = rows[r];
+                int c = 0;
+                row[c] = cursor.key;
+                c++;
+                AggregationState[] aggregationStates = cursor.value;
+                for (int i = 0; i < aggregationStates.length; i++) {
+                    aggregationCollectors[i].state(aggregationStates[i]);
+                    row[c] = aggregationCollectors[i].finishCollect();
+                    c++;
+                }
+
+                if (sendToDownStream) {
+                    sendToDownStream = downstream.setNextRow(row);
+                }
+                r++;
+            }
+            if (downstream != null) {
+                downstream.upstreamFinished();
+            }
+            return rows;
+        }
+
+        @Override
+        public Iterator<Object[]> iterator() {
+            return null;
+            //return new SingleEntryToRowIterator(
+            //        result.iterator(), aggregationCollectors.length + 1, aggregationCollectors);
+        }
     }
 
     private class SingleKeyGrouper implements Grouper {
@@ -176,10 +287,13 @@ public class GroupingProjector implements Projector {
         private final AggregationCollector[] aggregationCollectors;
         private final Input keyInput;
         private final CollectExpression[] collectExpressions;
+        private final SizeEstimator<Object> sizeEstimator;
 
-        public SingleKeyGrouper(Input keyInput,
+        public SingleKeyGrouper(DataType keyType,
+                                Input keyInput,
                                 CollectExpression[] collectExpressions,
                                 AggregationCollector[] aggregationCollectors) {
+            this.sizeEstimator = SizeEstimatorFactory.<Object>create(keyType);
             this.collectExpressions = collectExpressions;
             this.result = new HashMap<>();
             this.keyInput = keyInput;
@@ -187,9 +301,9 @@ public class GroupingProjector implements Projector {
         }
 
         @Override
-        public boolean setNextRow(Object... row) {
+        public boolean setNextRow(Object... row) throws CircuitBreakingException {
             for (CollectExpression collectExpression : collectExpressions) {
-               collectExpression.setNextRow(row);
+                collectExpression.setNextRow(row);
             }
 
             Object key = keyInput.value();
@@ -201,6 +315,7 @@ public class GroupingProjector implements Projector {
                     aggregationCollectors[i].processRow();
                     states[i] = aggregationCollectors[i].state();
                 }
+                circuitBreaker.addEstimateAndMaybeBreak(sizeEstimator.estimateSize(key));
                 result.put(key, states);
             } else {
                 for (int i = 0; i < aggregationCollectors.length; i++) {
@@ -330,7 +445,7 @@ public class GroupingProjector implements Projector {
         private final AggregationCollector[] aggregationCollectors;
 
         private SingleEntryToRowIterator(Iterator<Map.Entry<Object, AggregationState[]>> iter,
-                                   int rowLength, AggregationCollector[] aggregationCollectors) {
+                                         int rowLength, AggregationCollector[] aggregationCollectors) {
             this.iter = iter;
             this.rowLength = rowLength;
             this.aggregationCollectors = aggregationCollectors;
@@ -362,7 +477,7 @@ public class GroupingProjector implements Projector {
         private final AggregationCollector[] aggregationCollectors;
 
         private MultiEntryToRowIterator(Iterator<Map.Entry<List<Object>, AggregationState[]>> iter,
-                                   int rowLength, AggregationCollector[] aggregationCollectors) {
+                                        int rowLength, AggregationCollector[] aggregationCollectors) {
             this.iter = iter;
             this.rowLength = rowLength;
             this.aggregationCollectors = aggregationCollectors;
@@ -387,3 +502,4 @@ public class GroupingProjector implements Projector {
         }
     }
 }
+
