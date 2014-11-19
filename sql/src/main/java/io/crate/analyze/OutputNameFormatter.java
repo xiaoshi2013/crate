@@ -32,13 +32,13 @@ import java.util.List;
 
 public class OutputNameFormatter {
 
-    private final static InnerOutputNameFormatter INSTANCE = new InnerOutputNameFormatter();
+    private static final InnerOutputNameFormatter INSTANCE = new InnerOutputNameFormatter();
 
     public static String format(Expression expression) {
         return INSTANCE.process(expression, null);
     }
 
-    private static class InnerOutputNameFormatter extends ExpressionFormatter.Formatter {
+    static class InnerOutputNameFormatter extends ExpressionFormatter.Formatter {
         @Override
         protected String visitQualifiedNameReference(QualifiedNameReference node, Void context) {
 

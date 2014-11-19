@@ -73,8 +73,8 @@ public class ReferenceToTrueVisitorTest {
     }
 
     public Symbol fromSQL(String expression) {
-        analyzer.process(new Table(new QualifiedName(ImmutableList.of("information_schema", "tables"))), selectAnalysis);
-        return analyzer.process(SqlParser.createExpression(expression), selectAnalysis);
+        analyzer.process(new Table(new QualifiedName(ImmutableList.of("information_schema", "tables"))), analyzedQuerySpecification);
+        return analyzer.process(SqlParser.createExpression(expression), analyzedQuerySpecification);
     }
 
     @Test

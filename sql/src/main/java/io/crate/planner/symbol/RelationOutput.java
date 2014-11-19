@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.  You may
  * obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -22,87 +22,67 @@
 package io.crate.planner.symbol;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import io.crate.metadata.ReferenceInfo;
+import io.crate.analyze.relations.AnalyzedRelation;
 import io.crate.types.DataType;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
 import java.io.IOException;
 
-public class Reference extends Symbol {
+public class RelationOutput extends Symbol {
 
-    public static final SymbolFactory<Reference> FACTORY = new SymbolFactory<Reference>() {
+    public static final SymbolFactory<RelationOutput> FACTORY = new SymbolFactory<RelationOutput>() {
         @Override
-        public Reference newInstance() {
-            return new Reference();
+        public RelationOutput newInstance() {
+            return new RelationOutput();
         }
     };
 
-    protected ReferenceInfo info;
+    private AnalyzedRelation relation;
+    private Symbol target;
 
-    public Reference(ReferenceInfo info) {
-        Preconditions.checkArgument(info!=null, "Info is null");
-        this.info = info;
+    public RelationOutput(AnalyzedRelation relation, Symbol target) {
+        this.relation = relation;
+        this.target = target;
     }
 
-    public Reference() {
+    private RelationOutput() {}
 
+    public AnalyzedRelation relation() {
+        return relation;
     }
 
-    public ReferenceInfo info() {
-        return info;
+    public Symbol target() {
+        return target;
     }
 
     @Override
     public SymbolType symbolType() {
-        return SymbolType.REFERENCE;
-    }
-
-    @Override
-    public DataType valueType() {
-        return info().type();
-    }
-
-    @Override
-    public String toString() {
-        return MoreObjects.toStringHelper(this)
-                .add("info", info())
-                .toString();
+        return SymbolType.RELATION_OUTPUT;
     }
 
     @Override
     public <C, R> R accept(SymbolVisitor<C, R> visitor, C context) {
-        return visitor.visitReference(this, context);
+        return visitor.visitRelationOutput(this, context);
+    }
+
+    @Override
+    public DataType valueType() {
+        return target.valueType();
     }
 
     @Override
     public void readFrom(StreamInput in) throws IOException {
-        info = new ReferenceInfo();
-        info.readFrom(in);
+        throw new UnsupportedOperationException("RelationOutput is not streamable");
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
-        info().writeTo(out);
+        throw new UnsupportedOperationException("RelationOutput is not streamable");
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if ((obj == null) || (getClass() != obj.getClass())) {
-            return false;
-        }
-
-        Reference o = (Reference) obj;
-        return Objects.equal(info().ident(), o.info().ident());
-    }
-
-    @Override
-    public int hashCode() {
-        return info().hashCode();
+    public String toString() {
+        return MoreObjects.toStringHelper(RelationOutput.class).add("target", target).add("relation", relation).toString();
     }
 }

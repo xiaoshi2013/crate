@@ -23,7 +23,9 @@ package io.crate.analyze;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
-import io.crate.exceptions.SQLParseException;
+import io.crate.analyze.expressions.ExpressionToNumberVisitor;
+import io.crate.analyze.relations.RelationAnalysisContext;
+import io.crate.analyze.relations.RelationAnalyzer;
 import io.crate.metadata.*;
 import io.crate.metadata.table.TableInfo;
 import io.crate.planner.symbol.*;
@@ -102,58 +104,62 @@ public class SelectStatementAnalyzer extends DataStatementAnalyzer<SelectAnalyze
     }
 
     protected Symbol visitQuerySpecification(QuerySpecification node, SelectAnalyzedStatement context) {
-        // visit the from first, since this qualifies the select
-        int numTables = node.getFrom() == null ? 0 : node.getFrom().size();
-        if (numTables != 1) {
-            throw new SQLParseException(
-                    "Only exactly one table is allowed in the from clause, got: " + numTables
-            );
-        }
-        process(node.getFrom().get(0), context);
+        RelationAnalyzer relationAnalyzer = new RelationAnalyzer(
+                new AnalysisMetaData(functions, referenceInfos, globalReferenceResolver), context.parameterContext());
 
-        context.limit(intFromOptionalExpression(node.getLimit(), context.parameters()));
-        context.offset(firstNonNull(
-                intFromOptionalExpression(node.getOffset(), context.parameters()), 0));
-
-
-        context.whereClause(generateWhereClause(node.getWhere(), context));
-
-        if (!node.getGroupBy().isEmpty()) {
-            context.selectFromFieldCache = true;
-        }
-
-        process(node.getSelect(), context);
-
-        // validate select symbols
-        for (Symbol symbol : context.outputSymbols()) {
-            SELECT_SYMBOL_VALIDATOR.process(symbol, new SelectSymbolValidator.SelectContext(context.selectFromFieldCache));
-        }
-
-        if (!node.getGroupBy().isEmpty()) {
-            analyzeGroupBy(node.getGroupBy(), context);
-        }
-
-        if (!node.getGroupBy().isEmpty() || context.hasAggregates()) {
-            ensureNonAggregatesInGroupBy(context);
-        }
-
-        if (node.getSelect().isDistinct() && node.getGroupBy().isEmpty()) {
-            rewriteGlobalDistinct(context);
-        }
-
-        if (node.getHaving().isPresent()) {
-            if (node.getGroupBy().isEmpty() && !context.hasAggregates()) {
-                throw new IllegalArgumentException("HAVING clause can only be used in GROUP BY or global aggregate queries");
-            }
-            processHavingClause(node.getHaving().get(), context);
-        }
-
-        if (node.getOrderBy().isEmpty()) {
-            context.orderBy(OrderBy.NO_ORDER_BY);
-        } else {
-            context.orderBy(getOrderBy(node.getOrderBy(), context));
-        }
+        RelationAnalysisContext relationAnalysisContext = new RelationAnalysisContext();
+        context = (AnalyzedQuerySpecification) relationAnalyzer.process(node, relationAnalysisContext);
         return null;
+
+//        int numTables = node.getFrom() == null ? 0 : node.getFrom().size();
+//        if (numTables != 1) {
+//            throw new SQLParseException(
+//                    "Only exactly one table is allowed in the from clause, got: " + numTables
+//            );
+//        }
+//        process(node.getFrom().get(0), context);
+//
+//        context.limit(intFromOptionalExpression(node.getLimit(), context.parameters()));
+//        context.offset(firstNonNull(
+//                intFromOptionalExpression(node.getOffset(), context.parameters()), 0));
+//
+//
+//        context.whereClause(generateWhereClause(node.getWhere(), context));
+//
+//        if (!node.getGroupBy().isEmpty()) {
+//            context.selectFromFieldCache = true;
+//        }
+//
+//        process(node.getSelect(), context);
+//
+//        // validate select symbols
+//        for (Symbol symbol : context.outputSymbols()) {
+//            SELECT_SYMBOL_VALIDATOR.process(symbol, new SelectSymbolValidator.SelectContext(context.selectFromFieldCache));
+//        }
+//
+//        if (!node.getGroupBy().isEmpty()) {
+//            analyzeGroupBy(node.getGroupBy(), context);
+//        }
+//
+//        if (!node.getGroupBy().isEmpty() || context.hasAggregates()) {
+//            ensureNonAggregatesInGroupBy(context);
+//        }
+//
+//        if (node.getSelect().isDistinct() && node.getGroupBy().isEmpty()) {
+//            rewriteGlobalDistinct(context);
+//        }
+//
+//        if (node.getHaving().isPresent()) {
+//            if (node.getGroupBy().isEmpty() && !context.hasAggregates()) {
+//                throw new IllegalArgumentException("HAVING clause can only be used in GROUP BY or global aggregate queries");
+//            }
+//            processHavingClause(node.getHaving().get(), context);
+//        }
+//
+//        if (node.getOrderBy().size() > 0) {
+//            addSorting(node.getOrderBy(), context);
+//        }
+//        return null;
     }
 
     private void processHavingClause(Expression expression, SelectAnalyzedStatement context) {
