@@ -23,6 +23,7 @@ package io.crate.analyze;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.exceptions.*;
 import io.crate.metadata.*;
 import io.crate.metadata.sys.SysSchemaInfo;
@@ -45,7 +46,7 @@ import java.util.*;
 /**
  * Holds information the analyzer has gathered about a statement.
  */
-public abstract class AbstractDataAnalyzedStatement extends AnalyzedStatement {
+public abstract class AbstractDataAnalyzedStatement extends DeprecatedAnalyzedStatement {
 
     protected static final Predicate<ReferenceInfo> HAS_OBJECT_ARRAY_PARENT = new Predicate<ReferenceInfo>() {
         @Override

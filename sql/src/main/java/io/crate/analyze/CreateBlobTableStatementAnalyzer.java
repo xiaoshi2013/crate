@@ -23,6 +23,7 @@ package io.crate.analyze;
 
 import io.crate.Constants;
 import io.crate.analyze.expressions.ExpressionToNumberVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.sql.tree.ClusteredBy;
 import io.crate.sql.tree.CreateBlobTable;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
@@ -62,7 +63,7 @@ public class CreateBlobTableStatementAnalyzer extends BlobTableAnalyzer<CreateBl
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new CreateBlobTableAnalyzedStatement(parameterContext);
     }
 }

@@ -22,15 +22,16 @@
 package io.crate.analyze;
 
 import com.google.common.base.Preconditions;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.TableIdent;
 import io.crate.sql.tree.*;
 
-public abstract class AbstractStatementAnalyzer<R, T extends AnalyzedStatement> extends DefaultTraversalVisitor<R, T> {
+public abstract class AbstractStatementAnalyzer<R, C extends DeprecatedAnalyzedStatement> extends DefaultTraversalVisitor<R, C> {
 
-    public abstract AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext);
+    public abstract DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext);
 
     @Override
-    protected R visitTable(Table node, T context) {
+    protected R visitTable(Table node, C context) {
         Preconditions.checkState(context.table() == null, "selecting from multiple tables is not supported");
         TableIdent tableIdent = TableIdent.of(node);
         context.table(tableIdent);
@@ -38,7 +39,7 @@ public abstract class AbstractStatementAnalyzer<R, T extends AnalyzedStatement> 
     }
 
     @Override
-    protected R visitNode(Node node, T context) {
+    protected R visitNode(Node node, C context) {
         throw new UnsupportedOperationException("Unsupported statement.");
     }
 
@@ -48,112 +49,112 @@ public abstract class AbstractStatementAnalyzer<R, T extends AnalyzedStatement> 
      * remove those methods if expressions gets supported
      */
     @Override
-    protected R visitExtract(Extract node, T context) {
+    protected R visitExtract(Extract node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitBetweenPredicate(BetweenPredicate node, T context) {
+    protected R visitBetweenPredicate(BetweenPredicate node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitCoalesceExpression(CoalesceExpression node, T context) {
+    protected R visitCoalesceExpression(CoalesceExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitWith(With node, T context) {
+    protected R visitWith(With node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitWithQuery(WithQuery node, T context) {
+    protected R visitWithQuery(WithQuery node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitWhenClause(WhenClause node, T context) {
+    protected R visitWhenClause(WhenClause node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    public R visitWindow(Window node, T context) {
+    public R visitWindow(Window node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitSimpleCaseExpression(SimpleCaseExpression node, T context) {
+    protected R visitSimpleCaseExpression(SimpleCaseExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitNullIfExpression(NullIfExpression node, T context) {
+    protected R visitNullIfExpression(NullIfExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitIfExpression(IfExpression node, T context) {
+    protected R visitIfExpression(IfExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitSearchedCaseExpression(SearchedCaseExpression node, T context) {
+    protected R visitSearchedCaseExpression(SearchedCaseExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitSubqueryExpression(SubqueryExpression node, T context) {
+    protected R visitSubqueryExpression(SubqueryExpression node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitUnion(Union node, T context) {
+    protected R visitUnion(Union node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitIntersect(Intersect node, T context) {
+    protected R visitIntersect(Intersect node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitExcept(Except node, T context) {
+    protected R visitExcept(Except node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitTableSubquery(TableSubquery node, T context) {
+    protected R visitTableSubquery(TableSubquery node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitJoin(Join node, T context) {
+    protected R visitJoin(Join node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitSampledRelation(SampledRelation node, T context) {
+    protected R visitSampledRelation(SampledRelation node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitCurrentTime(CurrentTime node, T context) {
+    protected R visitCurrentTime(CurrentTime node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    protected R visitExists(ExistsPredicate node, T context) {
+    protected R visitExists(ExistsPredicate node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    public R visitInputReference(InputReference node, T context) {
+    public R visitInputReference(InputReference node, C context) {
         return visitNode(node, context);
     }
 
     @Override
-    public R visitMatchPredicate(MatchPredicate node, T context) {
+    public R visitMatchPredicate(MatchPredicate node, C context) {
         return visitNode(node, context);
     }
 }

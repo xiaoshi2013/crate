@@ -53,6 +53,11 @@ import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import java.util.*;
 
 
+/**
+ * Use {@link io.crate.analyze.relations.RelationAnalyzer} and {@link io.crate.analyze.expressions.ExpressionAnalyzer} instead
+ * @param <T>
+ */
+@Deprecated
 abstract class DataStatementAnalyzer<T extends AbstractDataAnalyzedStatement> extends AbstractStatementAnalyzer<Symbol, T> {
 
     private final static Map<ComparisonExpression.Type, ComparisonExpression.Type> swapOperatorTable = ImmutableMap.<ComparisonExpression.Type, ComparisonExpression.Type>builder()

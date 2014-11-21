@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.core.StringUtils;
 import io.crate.core.collections.StringObjectMaps;
 import io.crate.exceptions.ColumnValidationException;
@@ -219,7 +220,7 @@ public class InsertFromValuesAnalyzer extends AbstractInsertAnalyzer<InsertFromV
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new InsertFromValuesAnalyzedStatement(referenceInfos, functions, parameterContext, globalReferenceResolver);
     }
 }

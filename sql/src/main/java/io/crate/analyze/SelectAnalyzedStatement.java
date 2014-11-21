@@ -21,138 +21,82 @@
 
 package io.crate.analyze;
 
-import com.google.common.collect.ArrayListMultimap;
+import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import io.crate.analyze.relations.AnalyzedRelation;
 import io.crate.analyze.relations.RelationVisitor;
-import io.crate.exceptions.AmbiguousColumnAliasException;
-import io.crate.metadata.Functions;
-import io.crate.metadata.ReferenceInfos;
-import io.crate.metadata.ReferenceResolver;
-import io.crate.planner.symbol.Literal;
+import io.crate.metadata.ColumnIdent;
+import io.crate.planner.symbol.Reference;
 import io.crate.planner.symbol.Symbol;
-import io.crate.planner.symbol.SymbolType;
+import io.crate.planner.symbol.Symbols;
+import io.crate.sql.tree.QualifiedName;
+import io.crate.types.DataType;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
+public class SelectAnalyzedStatement implements AnalyzedStatement, AnalyzedRelation {
 
-public class SelectAnalyzedStatement extends AbstractDataAnalyzedStatement implements AnalyzedRelation {
+    private final Multimap<String, Symbol> selectList;
+    private final Map<QualifiedName, AnalyzedRelation> sources;
+    private final WhereClause whereClause;
+    private final List<Symbol> groupBy;
+    private final OrderBy orderBy;
+    private final Symbol having;
+    private final Integer limit;
+    private final int offset;
 
-    private Integer limit;
-    private int offset = 0;
-    private List<Symbol> groupBy;
-    protected boolean selectFromFieldCache = false;
-
-    private Symbol havingClause;
-
-    private Multimap<String, Symbol> aliasMap = ArrayListMultimap.create();
-    private OrderBy orderBy;
-
-    public SelectAnalyzedStatement(ReferenceInfos referenceInfos, Functions functions,
-                                   Analyzer.ParameterContext parameterContext, ReferenceResolver referenceResolver) {
-        super(referenceInfos, functions, parameterContext, referenceResolver);
-    }
-
-    public void limit(Integer limit) {
+    public SelectAnalyzedStatement(Multimap<String, Symbol> selectList,
+                                   Map<QualifiedName, AnalyzedRelation> sources,
+                                   WhereClause whereClause,
+                                   List<Symbol> groupBy,
+                                   OrderBy orderBy,
+                                   Symbol having,
+                                   Integer limit,
+                                   int offset) {
+        this.selectList = selectList;
+        this.sources = sources;
+        this.whereClause = whereClause;
+        this.groupBy = groupBy;
+        this.orderBy = orderBy;
+        this.having = having;
         this.limit = limit;
+        this.offset = offset;
     }
 
-    public Integer limit() {
-        return limit;
+    public OrderBy orderBy() {
+        return orderBy;
     }
 
-    public int offset() {
-        return offset;
+    public List<Symbol> groupBy() {
+        return groupBy;
     }
 
     public boolean isLimited() {
         return limit != null || offset > 0;
     }
 
-    public void groupBy(List<Symbol> groupBy) {
-        if (groupBy != null && groupBy.size() > 0) {
-            sysExpressionsAllowed = true;
-        }
-        this.groupBy = groupBy;
-    }
-
-    @Nullable
-    public List<Symbol> groupBy() {
-        return groupBy;
-    }
-
-    public boolean hasGroupBy() {
-        return groupBy != null && groupBy.size() > 0;
-    }
-
-    @Nullable
-    public Symbol havingClause() {
-        return havingClause;
-    }
-
-    public void havingClause(Symbol clause) {
-        this.havingClause = normalizer.process(clause, null);
+    @Override
+    public Collection<String> outputNames() {
+        return selectList.keys();
     }
 
     @Override
-    public boolean hasNoResult() {
-        if (havingClause != null && havingClause.symbolType() == SymbolType.LITERAL) {
-            Literal havingLiteral = (Literal)havingClause;
-            if (havingLiteral.value() == false) {
-                return true;
-            }
-        }
-
-        if (globalAggregate()) {
-            return firstNonNull(limit(), 1) < 1 || offset() > 0;
-        }
-        return noMatch() || (limit() != null && limit() == 0);
+    public Collection<DataType> outputTypes() {
+        return Symbols.extractTypes(selectList.values());
     }
 
-    private boolean globalAggregate() {
-        return hasAggregates() && !hasGroupBy();
-    }
-
-    public boolean hasAggregates() {
-        return hasAggregates;
-    }
-
-    public void offset(int offset) {
-        this.offset = offset;
-    }
-
-    public void addAlias(String alias, Symbol symbol) {
-        outputNames().add(alias);
-        aliasMap.put(alias, symbol);
-    }
-
-    @Nullable
-    public Symbol symbolFromAlias(String alias) {
-        Collection<Symbol> symbols = aliasMap.get(alias);
-        if (symbols.size() > 1) {
-            throw new AmbiguousColumnAliasException(alias);
-        }
-        if (symbols.isEmpty()) {
-            return null;
-        }
-
-        return symbols.iterator().next();
+    @Override
+    public boolean expectsAffectedRows() {
+        return false;
     }
 
     @Override
     public void normalize() {
-        if (!sysExpressionsAllowed && hasSysExpressions) {
-            throw new UnsupportedOperationException("Selecting system columns from regular " +
-                    "tables is currently only supported by queries using group-by or " +
-                    "global aggregates.");
-        }
-
-        super.normalize();
-        normalizer.normalizeInplace(groupBy());
-        orderBy.normalize(normalizer);
     }
 
     @Override
@@ -160,12 +104,20 @@ public class SelectAnalyzedStatement extends AbstractDataAnalyzedStatement imple
         return analyzedStatementVisitor.visitSelectStatement(this, context);
     }
 
-    public void orderBy(OrderBy orderBy) {
-        this.orderBy = orderBy;
+    @Override
+    public Reference getReference(ColumnIdent columnIdent) {
+        return null;
     }
 
-    public OrderBy orderBy() {
-        return orderBy;
+    @Override
+    public Map<String, Symbol> outputs() {
+        return Maps.transformValues(selectList.asMap(), new Function<Collection<Symbol>, Symbol>() {
+            @Nullable
+            @Override
+            public Symbol apply(Collection<Symbol> input) {
+                return Iterables.getOnlyElement(input);
+            }
+        });
     }
 
     @Override

@@ -23,6 +23,7 @@ package io.crate.analyze;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.Functions;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.ReferenceResolver;
@@ -33,7 +34,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeleteAnalyzedStatement extends AnalyzedStatement {
+public class DeleteAnalyzedStatement extends DeprecatedAnalyzedStatement {
 
     private static final Predicate<NestedDeleteAnalyzedStatement> HAS_NO_RESULT_PREDICATE = new Predicate<NestedDeleteAnalyzedStatement>() {
         @Override

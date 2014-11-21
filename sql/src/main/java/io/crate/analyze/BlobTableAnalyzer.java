@@ -24,6 +24,7 @@ package io.crate.analyze;
 import com.google.common.base.Preconditions;
 import io.crate.analyze.expressions.ExpressionToNumberVisitor;
 import io.crate.analyze.expressions.ExpressionToObjectVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.core.NumberOfReplicas;
 import io.crate.metadata.TableIdent;
 import io.crate.metadata.blob.BlobSchemaInfo;
@@ -35,7 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public abstract class BlobTableAnalyzer<TypeAnalysis extends AnalyzedStatement>
+public abstract class BlobTableAnalyzer<TypeAnalysis extends DeprecatedAnalyzedStatement>
         extends AbstractStatementAnalyzer<Void, TypeAnalysis> {
 
     protected static TableIdent tableToIdent(Table table) {

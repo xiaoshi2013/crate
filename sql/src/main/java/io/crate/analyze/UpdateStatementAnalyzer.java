@@ -22,6 +22,7 @@
 package io.crate.analyze;
 
 import com.google.common.base.Preconditions;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.core.collections.StringObjectMaps;
 import io.crate.exceptions.ColumnValidationException;
 import io.crate.metadata.*;
@@ -53,7 +54,7 @@ public class UpdateStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, U
                 }
 
                 @Override
-                public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+                public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
                     return new UpdateAnalyzedStatement.NestedAnalyzedStatement(
                         referenceInfos, functions, parameterContext, globalReferenceResolver);
                 }
@@ -157,7 +158,7 @@ public class UpdateStatementAnalyzer extends AbstractStatementAnalyzer<Symbol, U
 
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new UpdateAnalyzedStatement(referenceInfos, functions, parameterContext, globalReferenceResolver);
     }
 }

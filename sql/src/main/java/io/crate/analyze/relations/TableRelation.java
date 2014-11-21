@@ -26,10 +26,13 @@ import io.crate.metadata.ColumnIdent;
 import io.crate.metadata.ReferenceInfo;
 import io.crate.metadata.table.TableInfo;
 import io.crate.planner.symbol.Reference;
+import io.crate.planner.symbol.Symbol;
 import io.crate.types.ArrayType;
 import io.crate.types.DataTypes;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TableRelation implements AnalyzedRelation {
 
@@ -43,6 +46,7 @@ public class TableRelation implements AnalyzedRelation {
     };
 
     private TableInfo tableInfo;
+    private Map<String, Symbol> outputs;
 
     public TableRelation(TableInfo tableInfo) {
         this.tableInfo = tableInfo;
@@ -77,6 +81,21 @@ public class TableRelation implements AnalyzedRelation {
                     .build();
         }
         return new Reference(referenceInfo);
+    }
+
+    @Override
+    public Map<String, Symbol> outputs() {
+        if (outputs == null) {
+            outputs = new HashMap<>();
+            for (ReferenceInfo referenceInfo : tableInfo.columns()) {
+                if (referenceInfo.type().equals(DataTypes.NOT_SUPPORTED)) {
+                    continue;
+                }
+                ColumnIdent columnIdent = referenceInfo.ident().columnIdent();
+                outputs.put(columnIdent.name(), getReference(columnIdent));
+            }
+        }
+        return outputs;
     }
 
     /**

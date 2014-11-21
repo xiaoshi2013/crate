@@ -24,11 +24,12 @@ package io.crate.planner.symbol;
 import io.crate.types.DataType;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class Symbols {
 
-    public static List<DataType> extractTypes(List<? extends Symbol> symbols) {
+    public static List<DataType> extractTypes(Collection<? extends Symbol> symbols) {
         List<DataType> result = new ArrayList<>(symbols.size());
         for (Symbol symbol : symbols) {
             result.add(symbol.valueType());

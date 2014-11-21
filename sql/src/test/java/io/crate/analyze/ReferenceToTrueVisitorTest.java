@@ -47,7 +47,7 @@ public class ReferenceToTrueVisitorTest {
 
     private ReferenceToTrueVisitor visitor;
     private EvaluatingNormalizer normalizer;
-    private SelectAnalyzedStatement selectAnalysis;
+    private SelectAnalyzedStatement analyzedStatement;
     private SelectStatementAnalyzer analyzer;
 
     @Before
@@ -68,13 +68,13 @@ public class ReferenceToTrueVisitorTest {
             functions,
             referenceResolver
         );
-        selectAnalysis = (SelectAnalyzedStatement) analyzer.newAnalysis(
+        analyzedStatement = (SelectAnalyzedStatement) analyzer.newAnalysis(
             new Analyzer.ParameterContext(new Object[0], new Object[0][]));
     }
 
     public Symbol fromSQL(String expression) {
-        analyzer.process(new Table(new QualifiedName(ImmutableList.of("information_schema", "tables"))), analyzedQuerySpecification);
-        return analyzer.process(SqlParser.createExpression(expression), analyzedQuerySpecification);
+        analyzer.process(new Table(new QualifiedName(ImmutableList.of("information_schema", "tables"))), analyzedStatement);
+        return analyzer.process(SqlParser.createExpression(expression), analyzedStatement);
     }
 
     @Test

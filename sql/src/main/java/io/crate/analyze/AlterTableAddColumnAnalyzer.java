@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.*;
 import io.crate.metadata.table.TableInfo;
 import io.crate.sql.tree.AlterTableAddColumn;
@@ -44,7 +45,7 @@ public class AlterTableAddColumnAnalyzer extends AbstractStatementAnalyzer<Void,
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new AddColumnAnalyzedStatement(referenceInfos, fulltextAnalyzerResolver, parameterContext);
     }
 

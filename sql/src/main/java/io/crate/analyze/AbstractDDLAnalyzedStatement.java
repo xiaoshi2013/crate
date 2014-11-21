@@ -22,10 +22,11 @@
 package io.crate.analyze;
 
 import io.crate.Constants;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.exceptions.InvalidTableNameException;
 import io.crate.metadata.TableIdent;
 
-public abstract class AbstractDDLAnalyzedStatement extends AnalyzedStatement {
+public abstract class AbstractDDLAnalyzedStatement extends DeprecatedAnalyzedStatement {
 
     protected final TableParameter tableParameter = new TableParameter();
     protected TableIdent tableIdent;

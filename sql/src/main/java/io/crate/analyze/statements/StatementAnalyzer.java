@@ -29,7 +29,7 @@ import io.crate.analyze.relations.RelationAnalyzer;
 import io.crate.sql.tree.DefaultTraversalVisitor;
 import io.crate.sql.tree.Query;
 
-public class StatementAnalyzer extends DefaultTraversalVisitor<Void, StatementAnalysis> {
+public class StatementAnalyzer extends DefaultTraversalVisitor<StatementAnalysis, Void> {
 
     private AnalysisMetaData analysisMetaData;
     private final Analyzer.ParameterContext parameterContext;
@@ -41,11 +41,13 @@ public class StatementAnalyzer extends DefaultTraversalVisitor<Void, StatementAn
     }
 
     @Override
-    protected Void visitQuery(Query node, StatementAnalysis context) {
+    protected StatementAnalysis visitQuery(Query node, Void context) {
         RelationAnalyzer relationAnalyzer = new RelationAnalyzer(analysisMetaData, parameterContext);
         RelationAnalysisContext relationAnalysisContext = new RelationAnalysisContext();
         AnalyzedRelation relation = relationAnalyzer.process(node.getQueryBody(), relationAnalysisContext);
-        context.relation(relation);
-        return null;
+
+        StatementAnalysis statementAnalysis = new StatementAnalysis();
+        statementAnalysis.relation(relation);
+        return statementAnalysis;
     }
 }

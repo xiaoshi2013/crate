@@ -23,6 +23,7 @@ package io.crate.analyze;
 
 import com.google.common.base.Optional;
 import io.crate.analyze.expressions.ExpressionToStringVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.FulltextAnalyzerResolver;
 import io.crate.sql.tree.*;
 import org.elasticsearch.common.inject.Inject;
@@ -246,7 +247,7 @@ public class CreateAnalyzerStatementAnalyzer extends AbstractStatementAnalyzer<V
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new CreateAnalyzerAnalyzedStatement(fulltextAnalyzerResolver, parameterContext);
     }
 }

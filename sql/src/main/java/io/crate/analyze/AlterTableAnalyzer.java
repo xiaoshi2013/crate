@@ -22,6 +22,7 @@
 package io.crate.analyze;
 
 import io.crate.PartitionName;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.TableIdent;
 import io.crate.sql.tree.AlterTable;
@@ -84,7 +85,7 @@ public class AlterTableAnalyzer extends AbstractStatementAnalyzer<Void, AlterTab
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new AlterTableAnalyzedStatement(parameterContext, referenceInfos);
     }
 }

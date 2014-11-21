@@ -21,28 +21,31 @@
 
 package io.crate.analyze;
 
+import com.google.common.collect.Lists;
 import io.crate.analyze.relations.AnalyzedRelation;
 import io.crate.analyze.relations.RelationVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
+import io.crate.analyze.statements.StatementAnalysis;
+import io.crate.analyze.statements.StatementAnalyzer;
 import io.crate.exceptions.UnsupportedFeatureException;
 import io.crate.metadata.FunctionInfo;
 import io.crate.metadata.Functions;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.ReferenceResolver;
 import io.crate.operation.scalar.cast.CastFunctionResolver;
-import io.crate.planner.symbol.*;
+import io.crate.planner.symbol.Function;
+import io.crate.planner.symbol.Reference;
+import io.crate.planner.symbol.Symbol;
+import io.crate.planner.symbol.SymbolFormatter;
 import io.crate.sql.tree.InsertFromSubquery;
 import io.crate.sql.tree.Query;
 import io.crate.types.DataType;
 import org.elasticsearch.common.inject.Inject;
 
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFromSubQueryAnalyzedStatement> {
 
-    private final SelectStatementAnalyzer subQueryAnalyzer;
     private final Functions functions;
     private final ReferenceInfos referenceInfos;
     private final ReferenceResolver globalReferenceResolver;
@@ -51,11 +54,9 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
 
 
     @Inject
-    public InsertFromSubQueryAnalyzer(SelectStatementAnalyzer selectStatementAnalyzer,
-                                      Functions functions,
+    public InsertFromSubQueryAnalyzer(Functions functions,
                                       ReferenceInfos referenceInfos,
                                       ReferenceResolver globalReferenceResolver) {
-        this.subQueryAnalyzer = selectStatementAnalyzer;
         this.functions = functions;
         this.referenceInfos = referenceInfos;
         this.globalReferenceResolver = globalReferenceResolver;
@@ -68,7 +69,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
         process(node.subQuery(), context);
 
         Context relationCtx = new Context();
-        relationVisitor.process(context.subQueryRelation(), relationCtx);
+        relationVisitor.process(context.sourceRelation(), relationCtx);
         SelectAnalyzedStatement selectAnalyzedStatement = relationCtx.selectAnalyzedStatement;
 
         // We forbid using limit/offset or order by until we've implemented ES paging support (aka 'scroll')
@@ -78,7 +79,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
         }
 
         int numInsertColumns = node.columns().size() == 0 ? context.table().columns().size() : node.columns().size();
-        int maxInsertValues = Math.max(numInsertColumns, selectAnalyzedStatement.outputSymbols().size());
+        int maxInsertValues = Math.max(numInsertColumns, selectAnalyzedStatement.outputs().size());
         handleInsertColumns(node, maxInsertValues, context);
 
         validateMatchingColumns(context, selectAnalyzedStatement);
@@ -88,7 +89,13 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
 
     @Override
     protected Symbol visitQuery(Query node, InsertFromSubQueryAnalyzedStatement context) {
-        return subQueryAnalyzer.process(node, (SelectAnalyzedStatement) context.subQueryRelation());
+        StatementAnalyzer statementAnalyzer = new StatementAnalyzer(
+                new AnalysisMetaData(functions, referenceInfos, globalReferenceResolver),
+                context.parameterContext()
+        );
+        StatementAnalysis analysis = statementAnalyzer.process(node, null);
+        context.sourceRelation(analysis.relation());
+        return null;
     }
 
     /**
@@ -97,7 +104,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
      */
     private void validateMatchingColumns(InsertFromSubQueryAnalyzedStatement context, SelectAnalyzedStatement selectAnalyzedStatement) {
         List<Reference> insertColumns = context.columns();
-        List<Symbol> subQueryColumns = selectAnalyzedStatement.outputSymbols();
+        List<Symbol> subQueryColumns = Lists.newArrayList(selectAnalyzedStatement.outputs().values());
 
         if (insertColumns.size() != subQueryColumns.size()) {
             throw new IllegalArgumentException("Number of columns in insert statement and subquery differ");
@@ -130,7 +137,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
                     // replace column by `toX` function
                     FunctionInfo functionInfo = CastFunctionResolver.functionInfo(subQueryColumnType, insertColumn.valueType());
                     Function function = context.allocateFunction(functionInfo, Arrays.asList(subQueryColumn));
-                    if (selectAnalyzedStatement.hasGroupBy()) {
+                    if (!selectAnalyzedStatement.groupBy().isEmpty()) {
                         replaceIfPresent(selectAnalyzedStatement.groupBy(), subQueryColumn, function);
                     }
                     if (selectAnalyzedStatement.orderBy().isSorted()) {
@@ -153,7 +160,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new InsertFromSubQueryAnalyzedStatement(referenceInfos, functions, parameterContext, globalReferenceResolver);
     }
 

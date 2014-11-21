@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.metadata.TableIdent;
 import io.crate.sql.tree.DropTable;
@@ -42,7 +43,7 @@ public class DropTableStatementAnalyzer extends AbstractStatementAnalyzer<Void, 
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new DropTableAnalyzedStatement(referenceInfos);
     }
 }

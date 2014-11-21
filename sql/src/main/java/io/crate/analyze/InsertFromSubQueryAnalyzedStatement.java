@@ -28,18 +28,21 @@ import io.crate.metadata.ReferenceResolver;
 
 public class InsertFromSubQueryAnalyzedStatement extends AbstractInsertAnalyzedStatement {
 
-    private final AnalyzedRelation subQueryAnalysis;
+    private AnalyzedRelation sourceRelation;
 
     public InsertFromSubQueryAnalyzedStatement(ReferenceInfos referenceInfos,
                                                Functions functions,
                                                Analyzer.ParameterContext parameterContext,
                                                ReferenceResolver referenceResolver) {
         super(referenceInfos, functions, parameterContext, referenceResolver);
-        this.subQueryAnalysis = new SelectAnalyzedStatement(referenceInfos, functions, parameterContext, referenceResolver);
     }
 
-    public AnalyzedRelation subQueryRelation() {
-        return this.subQueryAnalysis;
+    public AnalyzedRelation sourceRelation() {
+        return this.sourceRelation;
+    }
+
+    public void sourceRelation(AnalyzedRelation relation) {
+        sourceRelation = relation;
     }
 
     @Override

@@ -23,6 +23,7 @@ package io.crate.analyze;
 
 import com.google.common.collect.Sets;
 import io.crate.analyze.expressions.ExpressionToStringVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.settings.CrateSettings;
 import io.crate.sql.tree.Assignment;
 import io.crate.sql.tree.Expression;
@@ -75,7 +76,7 @@ public class SetStatementAnalyzer extends AbstractStatementAnalyzer<Void, SetAna
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new SetAnalyzedStatement(parameterContext);
     }
 }

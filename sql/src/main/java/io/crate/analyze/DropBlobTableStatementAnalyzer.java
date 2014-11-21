@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.ReferenceInfos;
 import io.crate.sql.tree.DropBlobTable;
 import org.elasticsearch.common.inject.Inject;
@@ -41,7 +42,7 @@ public class DropBlobTableStatementAnalyzer extends BlobTableAnalyzer<DropBlobTa
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new DropBlobTableAnalyzedStatement(parameterContext, referenceInfos);
     }
 }

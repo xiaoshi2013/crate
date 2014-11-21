@@ -148,7 +148,7 @@ public class Planner extends AnalyzedStatementVisitor<Planner.Context, Plan> {
                 ImmutableSettings.EMPTY, // TODO: define reasonable writersettings
                 analysis.table().isPartitioned()
         );
-        return relationPlanner.process(analysis.subQueryRelation(), new Context(indexWriterProjection));
+        return relationPlanner.process(analysis.sourceRelation(), new Context(indexWriterProjection));
     }
 
     @Override

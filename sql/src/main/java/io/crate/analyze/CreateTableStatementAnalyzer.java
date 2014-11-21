@@ -25,6 +25,7 @@ import com.google.common.base.Strings;
 import io.crate.Constants;
 import io.crate.analyze.expressions.ExpressionToNumberVisitor;
 import io.crate.analyze.expressions.ExpressionToStringVisitor;
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.ColumnIdent;
 import io.crate.metadata.FulltextAnalyzerResolver;
 import io.crate.metadata.ReferenceInfos;
@@ -50,7 +51,7 @@ public class CreateTableStatementAnalyzer extends AbstractStatementAnalyzer<Void
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new CreateTableAnalyzedStatement(referenceInfos, fulltextAnalyzerResolver, parameterContext);
     }
 

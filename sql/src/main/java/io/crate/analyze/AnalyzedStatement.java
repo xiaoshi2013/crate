@@ -21,66 +21,19 @@
 
 package io.crate.analyze;
 
-import com.google.common.collect.ImmutableList;
-import io.crate.metadata.TableIdent;
-import io.crate.metadata.table.TableInfo;
 import io.crate.types.DataType;
 
-import java.util.List;
+import java.util.Collection;
 
-public abstract class AnalyzedStatement {
+public interface AnalyzedStatement {
 
-    private final Analyzer.ParameterContext parameterContext;
-    private List<String> outputNames = ImmutableList.of();
-    protected List<DataType> outputTypes = ImmutableList.of();
+    public Collection<String> outputNames();
 
-    protected String tableAlias;
+    public Collection<DataType> outputTypes();
 
-    public void tableAlias(String tableAlias) {
-        this.tableAlias = tableAlias;
-    }
+    public boolean expectsAffectedRows();
 
-    public String tableAlias() {
-        return tableAlias;
-    }
+    public void normalize();
 
-    protected AnalyzedStatement(Analyzer.ParameterContext parameterContext) {
-        this.parameterContext = parameterContext;
-    }
-
-    public abstract void table(TableIdent tableIdent);
-
-    public abstract TableInfo table();
-
-    public abstract boolean hasNoResult();
-
-    public abstract void normalize();
-
-    public void outputNames(List<String> outputNames) {
-        this.outputNames = outputNames;
-    }
-
-    public List<String> outputNames() {
-        return outputNames;
-    }
-
-    public List<DataType> outputTypes() {
-        return outputTypes;
-    }
-
-    public Analyzer.ParameterContext parameterContext() {
-        return parameterContext;
-    }
-
-    public Object[] parameters() {
-        return parameterContext.parameters();
-    }
-
-    public <C, R> R accept(AnalyzedStatementVisitor<C,R> analyzedStatementVisitor, C context) {
-        return analyzedStatementVisitor.visitAnalyzedStatement(this, context);
-    }
-
-    public boolean expectsAffectedRows() {
-        return false;
-    }
+    public <C, R> R accept(AnalyzedStatementVisitor<C,R> analyzedStatementVisitor, C context);
 }

@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.exceptions.PartitionUnknownException;
 import io.crate.exceptions.UnsupportedFeatureException;
 import io.crate.metadata.Functions;
@@ -127,7 +128,7 @@ public class CopyStatementAnalyzer extends DataStatementAnalyzer<CopyAnalyzedSta
     }
 
     @Override
-    public AnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
+    public DeprecatedAnalyzedStatement newAnalysis(Analyzer.ParameterContext parameterContext) {
         return new CopyAnalyzedStatement(referenceInfos, functions, parameterContext, globalReferenceResolver);
     }
 

@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
 import io.crate.metadata.TableIdent;
 import io.crate.metadata.table.TableInfo;
 import org.elasticsearch.common.settings.Settings;
@@ -29,7 +30,7 @@ import javax.annotation.Nullable;
 import java.util.Locale;
 import java.util.Set;
 
-public class SetAnalyzedStatement extends AnalyzedStatement {
+public class SetAnalyzedStatement extends DeprecatedAnalyzedStatement {
     private Settings settings;
     private Set<String> settingsToRemove;
     private boolean persistent = false;

@@ -21,6 +21,8 @@
 
 package io.crate.analyze;
 
+import io.crate.analyze.statements.DeprecatedAnalyzedStatement;
+
 import javax.annotation.Nullable;
 
 public class AnalyzedStatementVisitor<C, R> {
@@ -103,5 +105,9 @@ public class AnalyzedStatementVisitor<C, R> {
 
     public R visitAddColumnStatement(AddColumnAnalyzedStatement analysis, C context) {
         return visitDDLAnalyzedStatement(analysis, context);
+    }
+
+    public R visitDeprecatedAnalyzedStatement(DeprecatedAnalyzedStatement deprecatedAnalyzedStatement, C context) {
+        return visitAnalyzedStatement(deprecatedAnalyzedStatement, context);
     }
 }
