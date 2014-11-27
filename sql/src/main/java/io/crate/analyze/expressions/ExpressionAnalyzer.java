@@ -55,6 +55,7 @@ import javax.annotation.Nullable;
 import java.util.*;
 
 import static io.crate.planner.symbol.Literal.newLiteral;
+import static io.crate.planner.symbol.RelationOutput.unwrap;
 
 /**
  * <p>This Analyzer can be used to convert Expression from the SQL AST into symbols.</p>
@@ -461,7 +462,7 @@ public class ExpressionAnalyzer {
         protected Symbol visitComparisonExpression(ComparisonExpression node, ExpressionAnalysisContext context) {
             Symbol left = process(node.getLeft(), context);
             Symbol right = process(node.getRight(), context);
-            if (left.symbolType() == SymbolType.DYNAMIC_REFERENCE || right.symbolType() == SymbolType.DYNAMIC_REFERENCE) {
+            if (unwrap(left).symbolType() == SymbolType.DYNAMIC_REFERENCE || unwrap(right).symbolType() == SymbolType.DYNAMIC_REFERENCE) {
                 return Literal.NULL;
             }
             Comparison comparison = new Comparison(node.getType(), left, right);
@@ -560,7 +561,7 @@ public class ExpressionAnalyzer {
 
             DataType leftInnerType = ((CollectionType) leftType).innerType();
             if (leftInnerType.id() != StringType.ID) {
-                if (!(left instanceof Reference)) {
+                if (!(unwrap(left) instanceof Reference)) {
                     left = normalizeInputForType(left, new ArrayType(DataTypes.STRING));
                 } else {
                     throw new IllegalArgumentException(
@@ -588,13 +589,14 @@ public class ExpressionAnalyzer {
             }
 
             Symbol expressionSymbol = process(node.getValue(), context);
+            Symbol unwrappedExpressionSymbol = unwrap(expressionSymbol);
             Symbol patternSymbol = process(node.getPattern(), context);
 
             // handle possible parameter for expression
             // try implicit conversion
-            if (!(expressionSymbol instanceof Reference)) {
+            if (!(unwrappedExpressionSymbol instanceof Reference)) {
                 try {
-                    expressionSymbol = normalizeInputForType(expressionSymbol, StringType.INSTANCE);
+                    expressionSymbol = normalizeInputForType(unwrappedExpressionSymbol, StringType.INSTANCE);
                 } catch (IllegalArgumentException | UnsupportedOperationException e) {
                     throw new UnsupportedOperationException("<expression> LIKE <pattern>: expression couldn't be implicitly casted to string. Try to explicitly cast to string.");
                 }
@@ -603,8 +605,8 @@ public class ExpressionAnalyzer {
             DataType expressionType = expressionSymbol.valueType();
             DataType patternType;
             try {
-                if (expressionSymbol instanceof Reference) {
-                    patternSymbol = normalizeInputForReference(patternSymbol, (Reference) expressionSymbol);
+                if (unwrappedExpressionSymbol instanceof Reference) {
+                    patternSymbol = normalizeInputForReference(patternSymbol, (Reference) unwrappedExpressionSymbol);
                     patternType = patternSymbol.valueType();
                 } else {
                     patternSymbol = normalizeInputForType(patternSymbol, DataTypes.STRING);
@@ -760,7 +762,7 @@ public class ExpressionAnalyzer {
 
             Map<String, Object> identBoostMap = new HashMap<>();
             for (MatchPredicateColumnIdent ident : node.idents()) {
-                Symbol reference = RelationOutput.unwrap(process(ident.columnIdent(), context));
+                Symbol reference = unwrap(process(ident.columnIdent(), context));
                 Preconditions.checkArgument(
                         reference instanceof Reference,
                         SymbolFormatter.format("can only MATCH on references, not on %s", reference)

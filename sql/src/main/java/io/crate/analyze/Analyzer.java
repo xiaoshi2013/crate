@@ -48,7 +48,6 @@ public class Analyzer {
 
     public static class AnalyzerDispatcher extends AstVisitor<AnalyzedStatement, ParameterContext> {
 
-        private final SelectStatementAnalyzer selectStatementAnalyzer;
         private final InsertFromSubQueryAnalyzer insertFromSubQueryAnalyzer;
         private final UpdateStatementAnalyzer updateStatementAnalyzer;
         private final DropTableStatementAnalyzer dropTableStatementAnalyzer;
@@ -65,7 +64,6 @@ public class Analyzer {
 
         @Inject
         public AnalyzerDispatcher(AnalysisMetaData analysisMetaData,
-                                  SelectStatementAnalyzer selectStatementAnalyzer,
                                   InsertFromSubQueryAnalyzer insertFromSubQueryAnalyzer,
                                   UpdateStatementAnalyzer updateStatementAnalyzer,
                                   DropTableStatementAnalyzer dropTableStatementAnalyzer,
@@ -79,7 +77,6 @@ public class Analyzer {
                                   SetStatementAnalyzer setStatementAnalyzer,
                                   AlterTableAddColumnAnalyzer alterTableAddColumnAnalyzer) {
             this.analysisMetaData = analysisMetaData;
-            this.selectStatementAnalyzer = selectStatementAnalyzer;
             this.insertFromSubQueryAnalyzer = insertFromSubQueryAnalyzer;
             this.updateStatementAnalyzer = updateStatementAnalyzer;
             this.dropTableStatementAnalyzer = dropTableStatementAnalyzer;
@@ -103,7 +100,8 @@ public class Analyzer {
 
         @Override
         protected AnalyzedStatement visitQuery(Query node, ParameterContext context) {
-            return analyze(node, selectStatementAnalyzer, context);
+            SelectStatementAnalyzer analyzer = new SelectStatementAnalyzer(analysisMetaData, context);
+            return analyzer.process(node, null);
         }
 
         @Override

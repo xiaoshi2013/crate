@@ -85,11 +85,12 @@ public class PlannerContextBuilder {
     public PlannerContextBuilder output(List<Symbol> symbols) {
         if (context.steps == null) {
             for (Symbol symbol : symbols) {
-                context.outputs.add(context.allocateToCollect(symbol));
+                context.outputs.add(context.allocateToCollect(RelationOutput.unwrap(symbol)));
             }
         } else {
             // need to split on aggregations
             for (Symbol symbol : symbols) {
+                symbol = RelationOutput.unwrap(symbol);
                 context.parent = null;
                 Symbol splitSymbol = Planner.splitter.process(symbol, context);
                 Symbol resolvedSymbol;

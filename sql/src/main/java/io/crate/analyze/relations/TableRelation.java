@@ -32,7 +32,7 @@ import io.crate.types.ArrayType;
 import io.crate.types.DataTypes;
 
 import javax.annotation.Nullable;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class TableRelation implements AnalyzedRelation {
@@ -92,7 +92,7 @@ public class TableRelation implements AnalyzedRelation {
     @Override
     public Map<String, Symbol> outputs() {
         if (outputs == null) {
-            outputs = new HashMap<>();
+            outputs = new LinkedHashMap<>();
             for (ReferenceInfo referenceInfo : tableInfo.columns()) {
                 if (referenceInfo.type().equals(DataTypes.NOT_SUPPORTED)) {
                     continue;

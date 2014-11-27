@@ -21,6 +21,7 @@
 
 package io.crate.analyze;
 
+import com.google.common.collect.Lists;
 import io.crate.analyze.relations.AnalyzedRelation;
 import io.crate.analyze.relations.RelationVisitor;
 import io.crate.exceptions.UnsupportedFeatureException;
@@ -42,7 +43,6 @@ import java.util.Locale;
 
 public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFromSubQueryAnalyzedStatement> {
 
-    private final SelectStatementAnalyzer subQueryAnalyzer;
     private final Functions functions;
     private final ReferenceInfos referenceInfos;
     private final ReferenceResolver globalReferenceResolver;
@@ -51,11 +51,9 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
 
 
     @Inject
-    public InsertFromSubQueryAnalyzer(SelectStatementAnalyzer selectStatementAnalyzer,
-                                      Functions functions,
+    public InsertFromSubQueryAnalyzer(Functions functions,
                                       ReferenceInfos referenceInfos,
                                       ReferenceResolver globalReferenceResolver) {
-        this.subQueryAnalyzer = selectStatementAnalyzer;
         this.functions = functions;
         this.referenceInfos = referenceInfos;
         this.globalReferenceResolver = globalReferenceResolver;
@@ -78,7 +76,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
         }
 
         int numInsertColumns = node.columns().size() == 0 ? context.table().columns().size() : node.columns().size();
-        int maxInsertValues = Math.max(numInsertColumns, selectAnalyzedStatement.outputSymbols().size());
+        int maxInsertValues = Math.max(numInsertColumns, selectAnalyzedStatement.outputs().size());
         handleInsertColumns(node, maxInsertValues, context);
 
         validateMatchingColumns(context, selectAnalyzedStatement);
@@ -88,7 +86,8 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
 
     @Override
     protected Void visitQuery(Query node, InsertFromSubQueryAnalyzedStatement context) {
-        subQueryAnalyzer.process(node, (SelectAnalyzedStatement) context.subQueryRelation());
+        // TODO: use relationAnalyzer
+        //subQueryAnalyzer.process(node, (SelectAnalyzedStatement) context.subQueryRelation());
         return null;
     }
 
@@ -98,7 +97,7 @@ public class InsertFromSubQueryAnalyzer extends AbstractInsertAnalyzer<InsertFro
      */
     private void validateMatchingColumns(InsertFromSubQueryAnalyzedStatement context, SelectAnalyzedStatement selectAnalyzedStatement) {
         List<Reference> insertColumns = context.columns();
-        List<Symbol> subQueryColumns = selectAnalyzedStatement.outputSymbols();
+        List<Symbol> subQueryColumns = Lists.newArrayList(selectAnalyzedStatement.outputs().values());
 
         if (insertColumns.size() != subQueryColumns.size()) {
             throw new IllegalArgumentException("Number of columns in insert statement and subquery differ");

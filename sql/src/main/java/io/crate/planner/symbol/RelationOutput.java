@@ -22,12 +22,15 @@
 package io.crate.planner.symbol;
 
 import com.google.common.base.MoreObjects;
+import io.crate.analyze.WhereClause;
 import io.crate.analyze.relations.AnalyzedRelation;
 import io.crate.types.DataType;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RelationOutput extends Symbol {
 
@@ -38,8 +41,26 @@ public class RelationOutput extends Symbol {
         }
     };
 
+    public static WhereClause unwrap(WhereClause whereClause) {
+        if (whereClause.hasQuery()) {
+            return new WhereClause(unwrap(whereClause.query()));
+        }
+        return whereClause;
+    }
+
     public static Symbol unwrap(Symbol symbol) {
+        if (symbol == null) {
+            return null;
+        }
         return UNWRAPPING_VISITOR.process(symbol, null);
+    }
+
+    public static List<Symbol> unwrap(List<Symbol> symbols) {
+        List<Symbol> unwrapped = new ArrayList<>(symbols.size());
+        for (Symbol symbol : symbols) {
+            unwrapped.add(unwrap(symbol));
+        }
+        return unwrapped;
     }
 
     private static final UnwrappingVisitor UNWRAPPING_VISITOR = new UnwrappingVisitor();
