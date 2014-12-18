@@ -5,6 +5,8 @@ Changes for Crate
 Unreleased
 ==========
 
+ - Added support for the datetime function ``extract (field from source)``
+
  - Support column referencing in ``Update`` statement assignment
    expression
 
@@ -2095,3 +2097,4 @@ Unreleased
 ================
 
  - added NOTICE file
+
