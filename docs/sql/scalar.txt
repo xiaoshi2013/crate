@@ -150,7 +150,7 @@ extract(field from source)
 ``extract`` is a special expression that translates to a function which
 retrieves subfields such as day, hour or minute from a timestamp.
 
-The return type is dependend on the used ``field``.
+The return type depends on the used ``field``.
 
 synopsis
 ........
